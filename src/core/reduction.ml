@@ -77,6 +77,7 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
       ?(params    = Params.empty )
       ~(system    : SE.context)
       ?(vars      = Vars.empty_env)
+      ~(global  : bool)      
       ~(concrete  : bool)
       ~(red_param : red_param)
       (table      : Symbols.table)
@@ -86,7 +87,7 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
       Env.init ~table ~system
         ~ty_vars:params.ty_vars ~se_vars:params.se_vars ~vars ()
     in
-    let pc = ProofContext.make ~env ~hyps ~concrete in
+    let pc = ProofContext.make ~env ~hyps ~global ~concrete in
     { pc; red_param; }
 
   (*------------------------------------------------------------------*)
@@ -818,8 +819,10 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
       let hints = Term.Hm.find_dflt [] (Term.get_head t) db in
 
       let rule = List.find_map (fun Hint.{ cnt = rule } ->
-          match 
-            Rewrite.rewrite_head
+          match
+          (* Invariant: the st.pc used here was correctly initialized
+             with ~global *)
+            Rewrite.rewrite_head ~global:false
               ~param:Match.default_param ~concrete:st.pc.concrete
               (* no reduction here, to keep performances reasonable *)
               env.table params env.vars st.pc.hyps env.system.set
@@ -1113,7 +1116,7 @@ module type S = sig
   val to_state :
     ?system:SE.context ->
     ?vars:Vars.env ->
-    red_param -> ?concrete:bool -> t -> state
+    red_param -> global:bool -> ?concrete:bool -> t -> state
 
   (*------------------------------------------------------------------*)
   val reduce_global : 
@@ -1127,7 +1130,8 @@ module type S = sig
   (** reduces once at head position *)
   val reduce_head1 :
     ?system:SE.context -> 
-    red_param -> ?concrete:bool -> t -> 'a Equiv.f_kind -> 'a -> 'a * head_has_red
+    red_param -> global:bool -> ?concrete:bool ->
+    t -> 'a Equiv.f_kind -> 'a -> 'a * head_has_red
 
   (*------------------------------------------------------------------*)
   (** {2 expantion and destruction modulo } *)
@@ -1153,7 +1157,7 @@ module type S = sig
 
   val conv_term : 
     ?system:SE.context -> 
-    ?param:red_param -> ?concrete:bool ->
+    ?param:red_param -> global:bool -> ?concrete:bool ->
     t ->
     Term.term -> Term.term -> bool
 
@@ -1179,11 +1183,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       ?(system   : SE.context option)
       ?(vars     : Vars.env option) (* overloads [s] variables *)
       (red_param : red_param)
+      ~global
       ?(concrete : bool = true) (* safer option *)
       (s         : S.t)
     : state
     =
-    let pc = S.proof_context ?in_system:system ~concrete s in
+    let pc = S.proof_context ?in_system:system ~global ~concrete s in
     let pc =
       omap_dflt pc (fun vars -> ProofContext.set_vars vars pc) vars
     in
@@ -1194,10 +1199,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       We need type introspection here. *)
   let reduce_head1 (type a) 
       ?(system : SE.context option)
-      (param : red_param) ?(concrete:bool option) (s : S.t)
+      (param : red_param) ~global ?(concrete:bool option) (s : S.t)
       (k : a Equiv.f_kind) (x : a) : a * head_has_red
     =
-    let st = to_state ?system ?concrete param s in
+    let st = to_state ?system ~global ?concrete param s in
     match k with
     | Local_t  -> reduce_head1_term   st x
     | Global_t -> reduce_head1_global st x
@@ -1255,7 +1260,9 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
             (* reduce [t], which is w.r.t. [pair] *)
             let system = { system with set = (oget system.pair :> SE.t); } in
-            let state = to_state ~system ~vars ~concrete:true param s in
+            (* We are reducing in a global formalua, hence we drop
+               local hypothesis. *)
+            let state = to_state ~system ~global:true ~vars ~concrete:true param s in
             (* FEAT: concrete: we could be more precise depending on
                whether [f] is fully asymptotic or not (see
                [occurrence_kind] in [rewrite.ml]) *)
@@ -1275,7 +1282,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
 
       | Equiv.Atom (Reach f) ->
         let concrete = f.bound <> None in
-        let state = to_state ~system ~vars ~concrete param s in
+        let state = to_state ~system ~vars ~global:true ~concrete param s in
         let f_form = reduce_term state f.formula in
         let f_bound = 
           let state = set_concrete true state in
@@ -1286,10 +1293,10 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       | Equiv.Atom (Equiv e) ->
         let concrete = e.bound <> None in
         let system = { system with set = (oget system.pair :> SE.t); } in
-        let state = to_state ~system ~vars ~concrete param s in
+        let state = to_state ~system ~vars ~global:true ~concrete param s in
 
         let b_se = (SE.context_any) in
-        let b_state = to_state ~system:b_se ~vars ~concrete:true param s in
+        let b_state = to_state ~system:b_se ~vars ~global:true ~concrete:true param s in
 
         let e_terms = List.map   (reduce_term   state) e.terms in
         let e_bound = Utils.omap (reduce_term b_state) e.bound in
@@ -1300,7 +1307,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
           (* terms in [simpl_args] are single terms (thus [k=1])
              defined in no systems (thus the empty system) *)
           let system = { system with set = (SE.fset_empty ~k:1 env.table :> SE.t); } in
-          let state = to_state ~system ~vars ~concrete:true param s in
+          let state = to_state ~system ~vars ~global:true ~concrete:true param s in
           (* FEAT: concrete: we could be more precise depending on
              whether the atom is fully asymptotic or not (see
              [occurrence_kind] in [rewrite.ml]) *)
@@ -1309,7 +1316,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
         let multi_args =
           List.map (fun (se,args) ->
               let system = { system with set = se; } in
-              let state = to_state ~system ~vars ~concrete:true param s in
+              let state = to_state ~system ~vars ~global:true ~concrete:true param s in
               (* FEAT: concrete: idem *)
               ( se, List.map (reduce_term state) args )
             ) pa.multi_args
@@ -1326,7 +1333,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (s : S.t) (k : a Equiv.f_kind) (x : a) : a 
     =
     let reduce_term x = 
-      let st = to_state ?system param ?concrete s in
+      let st = to_state ?system param ~global:false ?concrete s in
       reduce_term st x
     in
     let reduce_global x =
@@ -1353,7 +1360,8 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       match destr_f x with
       | Some _ as res -> res
       | None ->
-        let x, has_red = reduce_head1_term (to_state rp_full ?concrete s) x in
+        (* This is only used with a local target *)
+        let x, has_red = reduce_head1_term (to_state rp_full ~global:false ?concrete s) x in
         if has_red <> True then 
           None                  (* did not reduce, failed *)
         else
@@ -1381,7 +1389,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       match destr_t0 x with
       | Some _ as res -> res
       | None ->
-        let x, has_red = reduce_head1_term (to_state rp_full ?concrete s) x in
+        let x, has_red = reduce_head1_term (to_state rp_full ~global:false ?concrete s) x in
         if has_red <> True then 
           None               (* did not reduce, failed *)
         else
@@ -1391,7 +1399,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       match destr_e0 x with
       | Some _ as res -> res
       | None ->
-        let x, has_red = reduce_head1_global (to_state rp_full ?concrete s) x in
+        let x, has_red = reduce_head1_global (to_state rp_full ~global:true ?concrete s) x in
         if has_red <> True then 
           None               (* did not reduce, failed *)
         else
@@ -1458,11 +1466,12 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
   let conv_term
       ?(system : SE.context option)
       ?(param : red_param = rp_default)
+      ~global
       ?(concrete : bool option)
       (s : S.t)
       (t1 : Term.term) (t2 : Term.term) : bool
     =
-    let state = to_state ?system param ?concrete s in
+    let state = to_state ?system param ~global ?concrete s in
     conv state t1 t2
 
   (** Exported. *)
@@ -1472,7 +1481,7 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (s : S.t)
       (e1 : Equiv.form) (e2 : Equiv.form) : bool
     =
-    let state = to_state ?system param s in
+    let state = to_state ?system ~global:true param s in
     conv_g state e1 e2
 
   (** We need type introspection there *)
@@ -1484,11 +1493,11 @@ module Mk (S : LowSequent.S) : S with type t := S.t = struct
       (x1 : a) (x2 : a) : bool
     =
     match k with
-    | Local_t  -> conv_term   ?system ~param ?concrete s x1 x2
+    | Local_t  -> conv_term   ?system ~param ~global:false ?concrete s x1 x2
     | Global_t -> conv_global ?system ~param           s x1 x2
     | Any_t ->
       match x1, x2 with
-      | Local  x1, Local  x2 -> conv_term   ?system ~param ?concrete s x1 x2
+      | Local  x1, Local  x2 -> conv_term   ?system ~param ~global:false ?concrete s x1 x2
       | Global x1, Global x2 -> conv_global ?system ~param           s x1 x2
       | _, _ -> false
 

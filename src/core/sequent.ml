@@ -970,10 +970,10 @@ module Mk (Args : MkArgs) : S with
     let form, has_red =
       match pt.form with
       | Equiv.Local f -> 
-        let f, has_red = Reduce.reduce_head1 Reduction.rp_full s Equiv.Local_t f in
+        let f, has_red = Reduce.reduce_head1 ~global:false Reduction.rp_full s Equiv.Local_t f in
         Equiv.Local f, has_red
       | Equiv.Global f ->
-        let f, has_red = Reduce.reduce_head1 Reduction.rp_full s Equiv.Global_t f in
+        let f, has_red = Reduce.reduce_head1 ~global:true Reduction.rp_full s Equiv.Global_t f in
         Equiv.Global f, has_red
     in
     let pt = { pt with form } in
@@ -1193,9 +1193,9 @@ module Mk (Args : MkArgs) : S with
        (with their tags). *)
     let full_env = Vars.add_vars (arg.args @ pt.args) (S.vars s) in
 
-    let try_match_term mv f_arg f1 =
+    let try_match_term ~global mv f_arg f1 =
       let pat_f1 = { pat_f1 with pat_op_term = f1 } in
-      Match.T.try_match
+      Match.T.try_match ~global
         ~param:Match.logic_param ~concrete
         ~ienv ~mv ~env:full_env
         table pt.system f_arg pat_f1
@@ -1207,15 +1207,15 @@ module Mk (Args : MkArgs) : S with
       match f1, arg.form with
       (* local/local *)
       | Local f1, Local f_arg ->
-        try_match_term arg.mv f_arg f1
+        try_match_term ~global:false arg.mv f_arg f1
 
       (* global [f1 <: b1]/ global [f_arg <: b_arg] *)
       | Global (Atom (Reach {formula = f1;    bound = Some b1;   })),
         Global (Atom (Reach {formula = f_arg; bound = Some b_arg;})) ->
         assert(pt.bound = Glob && arg.bound = Glob);
-        let* mv = try_match_term arg.mv f_arg f1 in
+        let* mv = try_match_term ~global:true arg.mv f_arg f1 in
         begin
-          match try_match_term mv b_arg b1 with
+          match try_match_term ~global:true mv b_arg b1 with
           (* formulas and bounds match *)
           | Match.Match _ as mr -> mr
 

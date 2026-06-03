@@ -659,7 +659,7 @@ let prf_equiv
   let phi_prf_proj p =
     let se = SE.project [p] system in
     let new_system = { env.system with set = (se :> SE.arbitrary); } in
-    let context = ES.proof_context ~in_system:new_system s in
+    let context = ES.proof_context ~global:true ~in_system:new_system s in
     
     phi_prf_proj ~use_path_cond:false ~under_hash:true ~oracle ~nprf loc
       context ~hash_f 
@@ -827,7 +827,7 @@ let prf_secrecy
   
   (* hyps and trace context needed by phi_prf, with the same system *)
   let new_system = {(ES.system s) with set=(system :> SE.arbitrary)} in
-  let context = ES.proof_context ~in_system:new_system s in  
+  let context = ES.proof_context ~global:true ~in_system:new_system s in  
 
 
   (* get the hash th (on the left or right), and the remaining terms us, vs *)

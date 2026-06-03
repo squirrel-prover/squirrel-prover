@@ -1162,7 +1162,8 @@ module TSet = struct
     let res = 
       match 
         Match.T.try_match
-          ~param:Match.crypto_param ~concrete:pc.concrete
+          (* global:false -> We build a valid set of hypothesis, we keep them all. *)
+          ~param:Match.crypto_param ~global:false ~concrete:pc.concrete
           ~env:env.vars ~hyps env.table env.system
           output.term input_pat
       with Match mv -> Some mv | _ -> None
@@ -1788,7 +1789,8 @@ let empty_result (mem: AbstractSet.mem) : result =
 
 (*------------------------------------------------------------------*)
 let pc_of_query (q : query) : ProofContext.t =
-  ProofContext.make ~env:q.env ~hyps:q.hyps ~concrete:q.concrete 
+  (* global:false -> we already filtered the hyps in EquivTactics.crypto *)
+  ProofContext.make ~env:q.env ~hyps:q.hyps ~global:false ~concrete:q.concrete 
 
 (*------------------------------------------------------------------*)
 (** Functions to chain query and result trought transitivity rules *)
@@ -2259,7 +2261,8 @@ module Game = struct
             pat_op_params = Params.Open.empty;
           }
         in
-        Match.T.try_match
+        (* global:false -> we already filtered the hyps in EquivTactics.crypto *)
+        Match.T.try_match ~global:false
           ~param:Match.crypto_param ~concrete:query.concrete
           ~env:env.vars ~hyps:query.hyps env.table env.system
           term.term pat
@@ -2569,7 +2572,7 @@ let unsatisfiable
     Match.mk_unif_state
       ~param:Match.crypto_param pc ~support:[]
   in
-  let res =  
+  let res =
     Match.known_set_check_impl
       pc.env.table ~st ?mv:None
       form Term.mk_false
@@ -3335,7 +3338,8 @@ and bideduce_fp
     let gen_post = AbstractSet.generalize togen post in (* try to take [ψ₀ = (∀ x, ψ)] *)
 
     let pc =
-      ProofContext.make ~env ~hyps:query.hyps ~concrete:query.concrete
+      (* Here, the query are local and we can keep them. *)
+      ProofContext.make ~env ~global:false ~hyps:query.hyps ~concrete:query.concrete
     in
 
     if AbstractSet.is_eq pc pre  gen_post && (* [φ ⇔ ψ₀] *)
@@ -3389,7 +3393,6 @@ let derecursify_term
   : rec_call_occ list
   =
   let table = pc.env.table in
-
   let t_fold : _ Match.Pos.f_map_fold = 
     fun t se vars conds p _info acc ->
       (* Put [t] in weak head normal form w.r.t. rules in [Reduction.rp_crypto].

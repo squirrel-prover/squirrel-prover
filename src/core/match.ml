@@ -1368,7 +1368,9 @@ let to_env (st : unif_state) : Env.t =
 
 let to_pc (st : unif_state) : ProofContext.t =
   let env = to_env st in
-  ProofContext.make ~env ~hyps:st.hyps ~concrete:st.concrete
+  (* ~global:false, we preserve the hyps from the unif_state, which
+     must have been correctly initialized. *)
+  ProofContext.make ~env ~hyps:st.hyps ~global:false ~concrete:st.concrete
     
 (*------------------------------------------------------------------*)
 let env_of_unif_state (st : unif_state) : Env.t =
@@ -1379,6 +1381,8 @@ let env_of_unif_state (st : unif_state) : Env.t =
 (** {2 Reduction utilities} *)
 
 (*------------------------------------------------------------------*)
+(* Internal use only: hyps must have been correctly initialized w.r.t
+   local/global hyps. *)
 let whnf0
     ~(red_param : ReductionCore.red_param)
     ~(strat : ReductionCore.red_strat)
@@ -1391,7 +1395,7 @@ let whnf0
   let module R : ReductionCore.Sig =
     (val ReductionCore.Register.get ())
   in
-  let red_st = R.mk_state0 ~hyps ~system ~vars ~red_param ~concrete table in
+  let red_st = R.mk_state0 ~hyps ~system ~vars ~red_param ~global:false ~concrete table in
   R.whnf_term ~strat red_st t
 
 (** Put [t] in weak-head normal form w.r.t. [st]. *)
@@ -1419,16 +1423,18 @@ let reduce_head1
   in
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
+    (* Invariant: st was correctly initialized w.r.t the global/local hyps *)
     R.mk_state0
       ~hyps:st.hyps ~system:st.system ~vars ~red_param
-      ~concrete:st.concrete st.table
+      ~global:false ~concrete:st.concrete st.table
   in
   R.reduce_head1_term ~strat red_st t
 
 (*------------------------------------------------------------------*)
 (** Try to convert [t1] to [t2]  w.r.t. [st]. *)
 let conv_term
-    (red_param : ReductionCore.red_param) (st : unif_state)
+    (red_param : ReductionCore.red_param)
+    (st : unif_state)
     (t1 : Term.term) (t2 : Term.term)
   : bool 
   =
@@ -1437,9 +1443,10 @@ let conv_term
   in
   let vars = Vars.add_vars st.bvs st.env in
   let red_st =
+    (* Invariant: st was correctly initialized w.r.t local/global hyps. *)
     R.mk_state0
       ~hyps:st.hyps ~system:st.system ~vars ~red_param
-      ~concrete:st.concrete st.table
+      ~global:false ~concrete:st.concrete st.table
   in
   R.conv red_st t1 t2
 
@@ -1447,6 +1454,7 @@ let conv_term
 (** Fully reduce [t]. *)
 let reduce_term
     ?(red_param = ReductionCore.rp_default)
+    ~(global : bool)
     ~(concrete : bool)
     ~(hyps : TraceHyps.hyps) ~(system : SE.context)
     ~(table : Symbols.table)
@@ -1457,7 +1465,7 @@ let reduce_term
     (val ReductionCore.Register.get ())
   in
   let red_st =
-    R.mk_state0 ~hyps ~system ~red_param ~concrete table
+    R.mk_state0 ~hyps ~system ~red_param ~global ~concrete table
   in
   R.reduce_term red_st t
 
@@ -1502,6 +1510,7 @@ let reduce_delta_def1
 (*------------------------------------------------------------------*)
 (** Try to find a action term [t0] equal to [t]. *)
 let as_action
+    ~(global : bool)
     ~concrete
     (table : Symbols.table) (sexpr : SE.context)
     (hyps : Hyps.TraceHyps.hyps)
@@ -1512,7 +1521,7 @@ let as_action
     Real.is_zero table
       (reduce_term
          ~red_param:ReductionCore.rp_default
-         ~concrete ~hyps ~system:sexpr ~table b)
+         ~global ~concrete ~hyps ~system:sexpr ~table b)
   in
   TraceHyps.find_map (fun (_x, f) ->
       let doit f =
@@ -1631,6 +1640,7 @@ let rec happens_term
     Return the list of atoms in [conds] that cannot be proved. *)
 let check_conds
     (table : Symbols.table)
+    ~(global : bool)
     ~(concrete : bool)
     ~(equal_ts : Term.terms)
     ?(hyps : TraceHyps.hyps = TraceHyps.empty)
@@ -1642,7 +1652,7 @@ let check_conds
   (* starts from [conds] decomposed as a list of elementary conditions *)
   let conds = ref (flatten_simplify conds) in
   let is_zero b =
-    Real.is_zero table (reduce_term ~hyps ~system ~table ~concrete b)
+    Real.is_zero table (reduce_term ~hyps ~system ~table ~global ~concrete b)
   in
 
   (* remove from [conds] the formulas that can be proved using
@@ -1707,8 +1717,9 @@ let reduce_delta_macro1
           (val ReductionCore.Register.get ())
         in
         let rp = ReductionCore.rp_default in
+        (* Invariant: pc was correctly initialized w.r.t local/global hyps *)
         let red_state =
-          R.mk_state0 ~system:env.system ~red_param:rp ~concrete env.table
+          R.mk_state0 ~system:env.system ~red_param:rp ~global:false ~concrete env.table
         in
         let red_fun = R.reduce_term red_state in
         try
@@ -1722,8 +1733,9 @@ let reduce_delta_macro1
       (* we have that [ts = ta] and [List.for_all ((=) ts) ts_list] *)
       let ts_list, ta = 
         let ta =
-          if constr then Constr.find_eq_action models ts 
-          else as_action ~concrete env.table env.system hyps ts
+          if constr then Constr.find_eq_action models ts
+          (* Invariant: the pc used here was correctly initialized with ~global *)
+          else as_action ~global:false ~concrete env.table env.system hyps ts
         in
         match ta with
         | None -> [], ts
@@ -1738,9 +1750,11 @@ let reduce_delta_macro1
 
       List.find_map (fun p ->
           if p.Macros.pattern = None then
-            let remaining_conds = 
+            let remaining_conds =
+              (* Invariant: the pc used here was correctly initialized
+                 with ~global *)
               check_conds
-                ~concrete env.table ~equal_ts:ts_list ~hyps
+                ~global:false ~concrete env.table ~equal_ts:ts_list ~hyps
                 env.system
                 p.when_cond 
             in
@@ -1844,7 +1858,8 @@ module type S = sig
   type t
 
   val try_match :
-    param:param -> 
+    param:param ->
+    global:bool ->    
     concrete:bool ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->
@@ -1858,6 +1873,7 @@ module type S = sig
 
   val find : 
     param:param ->
+    global:bool ->
     concrete:bool ->
     ?ienv:Infer.env ->
     ?in_system:SE.t ->
@@ -1881,6 +1897,7 @@ let unif_gen (type a)
        mode:[`EntailLR | `EntailRL | `Eq] -> a -> a -> unif_state -> Mvar.t) 
     ~(param  : param)
     ~(concrete : bool)
+    ~(global : bool)
     ?(mv     : Mvar.t option)
     ?(env    : Vars.env option)
     ?(ienv : Infer.env option)
@@ -1931,6 +1948,13 @@ let unif_gen (type a)
   in
 
   let mv_init = odflt Mvar.empty mv in
+
+  let hyps =
+    if not global then hyps else
+      (* if we are creating a proof context for unifying in a global
+         predicate, we drop the local hypothesis. *)
+      Hyps.get_globals hyps
+  in
   let st_init : unif_state = {
     mode = ut_mode;
     bvs = [];
@@ -2255,7 +2279,7 @@ module T (* : S with type t = Term.term *) = struct
   (** Exported.
       Remark: term matching ignores [mode]. *)
   let try_match
-      ~(param : param) ~concrete ?mv ?env ?ienv ?hyps
+      ~(param : param) ~global ~concrete ?mv ?env ?ienv ?hyps
       (table   : Symbols.table)
       (system  : SE.context)
       (t1      : Term.term)
@@ -2266,7 +2290,7 @@ module T (* : S with type t = Term.term *) = struct
       (fun[@warning "-27"] ~mode -> tunif)
 
       (* repeat arguments, wrapping [t1] in a pattern *)
-      ~param ~concrete ?mv ?env ?ienv ?hyps 
+      ~param ~global ~concrete ?mv ?env ?ienv ?hyps 
       table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
       t2
@@ -2274,14 +2298,16 @@ module T (* : S with type t = Term.term *) = struct
   (*------------------------------------------------------------------*)
   (** Exported.
       Remark: term matching ignores [mode]. *)
-  let unify =
+  let unify ~global =
     unif_gen
       Equiv.Local_t `Unif
       (fun[@warning "-27"] ~mode -> tunif)
+      ~global
 
   (*------------------------------------------------------------------*)
   let unify_opt 
       ?mv
+      ~global
       ~concrete
       (table : Symbols.table)
       (system  : SE.context)
@@ -2290,7 +2316,7 @@ module T (* : S with type t = Term.term *) = struct
     : Mvar.t option
     =
     let u =
-      unify ?mv ~param:default_param ~concrete table system t1 t2
+      unify ?mv ~param:default_param ~global ~concrete table system t1 t2
     in
     match u with
     | NoMatch _ -> None
@@ -2299,7 +2325,7 @@ module T (* : S with type t = Term.term *) = struct
   (*------------------------------------------------------------------*)
   (** Exported, find [Term.terms] in a [Term.term] *)
   let find
-      ~param ~concrete
+      ~param ~global ~concrete
       ?ienv
       ?(in_system : SE.t option)
       (table  : Symbols.table) 
@@ -2319,7 +2345,7 @@ module T (* : S with type t = Term.term *) = struct
         if not (is_in_system se) then acc, `Continue else
           let subterm_system = SE.reachability_context se in
           match
-            try_match ?ienv ~param ~concrete table subterm_system e pat
+            try_match ?ienv ~param ~global ~concrete table subterm_system e pat
           with
           | Match _ -> e :: acc, `Continue
           | _       -> acc, `Continue
@@ -3108,7 +3134,8 @@ and deduce_fa
             ~system:st.unif_state.system
             ~vars ()
         in
-        let pc = ProofContext.make ~env ~hyps:st.unif_state.hyps ~concrete:st.unif_state.concrete in        
+        (* Invariant: st used here was correclty initialized for ~global *)
+        let pc = ProofContext.make ~env ~hyps:st.unif_state.hyps ~global:false ~concrete:st.unif_state.concrete in        
         reduce_delta1
           ~unfold_opaque:true
           ~constr:red_param.constr
@@ -3245,7 +3272,9 @@ let apply_user_deduction_rules (pc : ProofContext.t) (k : 'info term_set) : 'inf
         begin
           let context = SE.{ set = k.se; pair = None; } in
           let try_match =
-            T.try_match
+            (* Invariant: the pc used here was correctly initialized
+               with ~global *)
+            T.try_match ~global:false
               ~param:default_param ~concrete:pc.concrete
               env.table context k.term pat
           in
@@ -3441,7 +3470,7 @@ let term_set_list_of_term
   term_set_strengthen pc ~inputs k
 
 let known_sets_of_terms
-    (pc : ProofContext.t) (terms : Term.terms) 
+    (pc : ProofContext.t) (terms : Term.terms)
   : info known_sets 
   =
   List.fold_left (fun inputs term ->
@@ -3621,8 +3650,9 @@ let mset_incl
   in
 
   let context = SE.{ set = system; pair = None; } in
-  match 
-    T.try_match
+  match
+    (* global:false has we do not have any hyps anyway *)
+    T.try_match ~global:false
       ~param:default_param ~concrete
       table context
       term1 pat2
@@ -3716,7 +3746,7 @@ let mset_inter
     }
   in
   let sys_cntxt = SE.{ set = system; pair = None; } in
-  match T.unify_opt ~concrete table sys_cntxt pat1 pat2 with
+  match T.unify_opt ~global:false ~concrete table sys_cntxt pat1 pat2 with
   | None -> None
   | Some mv ->
 
@@ -3756,7 +3786,7 @@ let mset_list_inter
 
 (** Return a specialization of [cand] that is a subset of [known]. *)
 let specialize
-    ~concrete
+    ~concrete ~global
     (table  : Symbols.table)
     (system : SE.fset)
     (cand   : cand_set)
@@ -3771,7 +3801,7 @@ let specialize
   in
 
   let sys_cntxt = SE.{ set = (system :> SE.t); pair = None; } in
-  match T.unify_opt ~mv ~concrete table sys_cntxt c_pat e_pat with
+  match T.unify_opt ~mv ~global ~concrete table sys_cntxt c_pat e_pat with
   | None -> None
   | Some mv -> (* [mv] represents substitution [θ] *)
     let subst = Mvar.to_subst_locals ~mode:`Unif mv in
@@ -3794,7 +3824,7 @@ let specialize
 
 (*------------------------------------------------------------------*)
 let specialize_all
-    ~concrete
+    ~concrete ~global
     (table  : Symbols.table)
     (system : SE.fset)
     (cand   : cand_set)
@@ -3805,7 +3835,7 @@ let specialize_all
     List.fold_left (fun acc (known : info term_set) ->
         let head = Term.get_head known.term in
         if cand_head = HVar || head = HVar || cand_head = head then
-          specialize ~concrete table system cand known :: acc
+          specialize ~global ~concrete table system cand known :: acc
         else acc
       ) [] known_sets
   in
@@ -3820,22 +3850,22 @@ let specialize_all
     This includes both direct specialization, and specialization relying on
     the Function Application rule. *)
 let rec specialize_deduce
-    ~concrete
+    ~concrete ~global
     (table  : Symbols.table)
     (env    : Vars.env)
     (system : SE.fset)
     (cand   : cand_set)
     (known_sets : info known_sets) : cand_sets
   =
-  let direct_deds = specialize_all ~concrete table system cand known_sets in
-  let fa_deds = specialize_deduce_fa ~concrete table env system cand known_sets in
+  let direct_deds = specialize_all ~global ~concrete table system cand known_sets in
+  let fa_deds = specialize_deduce_fa ~global ~concrete table env system cand known_sets in
 
   direct_deds @ fa_deds
 
 (** Return a list of specialization of the tuples in [cand] deducible from
     [terms] and [pseqs]. *)
 and specialize_deduce_list
-    ~concrete
+    ~concrete ~global
     (table  : Symbols.table)
     (env    : Vars.env)
     (system : SE.fset)
@@ -3848,7 +3878,7 @@ and specialize_deduce_list
     (* find deducible specialization of the first term of the tuple. *)
     let t_deds =
       specialize_deduce
-        ~concrete table env
+        ~global ~concrete table env
         system { cand with term = t } known_sets
     in
 
@@ -3860,7 +3890,7 @@ and specialize_deduce_list
         let cand_tail : cand_tuple_set = { t_ded with term = tail } in
         let tail_deds =
           specialize_deduce_list
-            ~concrete table env
+            ~global ~concrete table env
             system cand_tail known_sets
         in
 
@@ -3874,7 +3904,7 @@ and specialize_deduce_list
     using Function Application.
     Does not include direct specialization. *)
 and specialize_deduce_fa
-    ~concrete
+    ~concrete ~global
     (table  : Symbols.table)
     (env    : Vars.env)
     (system : SE.fset)
@@ -3890,7 +3920,7 @@ and specialize_deduce_fa
     let terms_cand = { cand with term = terms } in
     let terms_deds =
       specialize_deduce_list
-        ~concrete table env
+        ~global ~concrete table env
         system terms_cand known_sets
     in
     List.map (fun (terms_ded : cand_tuple_set) ->
@@ -3925,7 +3955,7 @@ and specialize_deduce_fa
         List.find_map (fun p ->
             if p.Macros.pattern = None &&
                check_conds
-                 table ~concrete ~equal_ts:[]
+                 table ~global ~concrete ~equal_ts:[]
                  ~hyps_list:[cand.cond; Term.mk_happens ts]
                  {set = (system :> SE.arbitrary); pair = None}
                  p.Macros.when_cond
@@ -3937,7 +3967,7 @@ and specialize_deduce_fa
       match res with
       | None -> []
       | Some body ->
-        specialize_deduce ~concrete table env system { cand with term = body } known_sets
+        specialize_deduce ~global ~concrete table env system { cand with term = body } known_sets
     end
 
   | Term.Proj (i,t) -> 
@@ -3962,7 +3992,7 @@ and specialize_deduce_fa
 (** [strenghten tbl system terms] strenghten [terms] by finding an inductive
     invariant on deducible messages which contains [terms]. *)
 let strengthen
-    ~concrete
+    ~concrete ~global
     (table  : Symbols.table)
     (system : SE.fset)
     (env    : Vars.env)
@@ -3999,7 +4029,7 @@ let strengthen
     let res =
       List.find_map (fun p ->
           if p.Macros.pattern = None &&
-             check_conds ~concrete ~equal_ts:[]
+             check_conds ~global ~concrete ~equal_ts:[]
                table ~hyps_list:[Term.mk_happens ts]
                {set = (system :> SE.t) ; pair = None }
                p.Macros.when_cond
@@ -4032,7 +4062,7 @@ let strengthen
         term_set_union init_terms known_sets
       in
       let ded_sets = specialize_deduce
-          ~concrete table env system
+          ~global ~concrete table env system
           cand_set all_known_sets
       in
 
@@ -4077,7 +4107,7 @@ let strengthen
               filter_specialize_deduce_action a cand init_terms known_sets
             ) cand_l
         in
-        (mname, mset_list_inter ~concrete table (system:>SE.t) env cand_l mset_l)
+        (mname, mset_list_inter  ~concrete table (system:>SE.t) env cand_l mset_l)
       ) cands
   in
 
@@ -4159,7 +4189,7 @@ let strengthen
   let init_terms = 
     let context = SE.{ set= (system :> SE.t); pair = None; } in
     let env = Env.init ~table ~system:context ~vars:env () in
-    let pc = ProofContext.make ~env ~hyps ~concrete in
+    let pc = ProofContext.make ~env ~hyps ~global ~concrete in
     known_sets_of_terms pc init_terms
   in
 
@@ -4271,8 +4301,9 @@ let deduce_terms
          && not (TConfig.post_quantum_equivs table)
       then
         let system = SE.to_fset se in
-        let msets = 
-          strengthen ~concrete:unif_state.concrete table system vars hyps inputs 
+        let msets =
+          (* Invariant: unif_state was correctly initialized w.r.t global/local hyps. *)
+          strengthen ~global:false ~concrete:unif_state.concrete table system vars hyps inputs 
         in
         msets_to_list msets
       else []
@@ -4539,10 +4570,9 @@ module E = struct
       (t1      : Equiv.form)
       (t2      : Equiv.form pat_op) 
     =
-    unif_gen
+    (unif_gen ~global:true)
        Equiv.Global_t `Match
        unif_global
-
       (* repeat arguments, wrapping [t1] in a pattern *)
       ~param ~concrete ?mv ?env ?ienv ?hyps table system
       Term.{ pat_op_term = t1; pat_op_vars = []; pat_op_params = Params.Open.empty; }
@@ -4551,7 +4581,7 @@ module E = struct
   (*------------------------------------------------------------------*)
   (** Exported, find [Term.terms] in a [Equiv.form] *)
   let find
-      ~param ~concrete
+      ~param ~global ~concrete
       ?ienv
       ?(in_system : SE.t option)
       (table  : Symbols.table) 
@@ -4560,6 +4590,7 @@ module E = struct
       (t      : Equiv.form) 
     : Term.terms
     =
+    let _ = global in (* unused global parameter to match module type *)
     let is_in_system : SE.t -> bool =
       match in_system with
       | None           -> fun _ -> true
@@ -4571,7 +4602,7 @@ module E = struct
         if not (is_in_system se) then acc, `Continue else
           let subterm_system = SE.reachability_context se in
           match 
-            T.try_match ?ienv ~param ~concrete table subterm_system e pat 
+            T.try_match ?ienv ~global:true ~param ~concrete table subterm_system e pat 
           with
           | Match _ -> e :: acc, `Continue
           | _       ->      acc, `Continue

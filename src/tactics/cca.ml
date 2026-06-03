@@ -725,7 +725,7 @@ let indcca1 (i:int L.located) (s:ES.sequent) : ES.sequents =
        [{set = proj of env.system.pair, pair = env.system.pair}] *)
     let se = SE.project [proj] system in
     let system = {env.system with set=(se :> SE.arbitrary)} in
-    let context = ES.proof_context ~in_system:system s in
+    let context = ES.proof_context ~global:true ~in_system:system s in
     phi_cca_proj ~use_path_cond ~loc context icp biframe proj
   in
 
@@ -738,7 +738,7 @@ let indcca1 (i:int L.located) (s:ES.sequent) : ES.sequents =
   (* Removing duplicates. We already did that for occurrences, but
      only within [phi_l] and [phi_r], not across both *)
   let phis =
-    List.remove_duplicate (ES.Reduce.conv_term s) (phi_l @ phi_r)
+    List.remove_duplicate (ES.Reduce.conv_term ~global:true s) (phi_l @ phi_r)
   in
 
   let phi = Term.mk_ands ~simpl:true phis in

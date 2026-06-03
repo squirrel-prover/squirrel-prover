@@ -106,7 +106,7 @@ let refl (e : Equiv.equiv) (s : ES.t) =
     match ES.get_frame l_proj s, ES.get_frame r_proj s with
     | Some el, Some er ->
       let system = { (ES.system s) with set = (system_pair :> SE.t); } in
-      if List.for_all2 (ES.Reduce.conv_term ~system s) el.terms er.terms
+      if List.for_all2 (ES.Reduce.conv_term ~global:true ~system s) el.terms er.terms
       then `True
       else `NoRefl
 
@@ -436,7 +436,7 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
   let conclusion = ES.conclusion s in
 
   let is_false = function
-    | Equiv.Reach {formula = f; bound = None} -> ES.Reduce.conv_term s f Term.mk_false
+    | Equiv.Reach {formula = f; bound = None} -> ES.Reduce.conv_term ~global:false s f Term.mk_false
     (* FEAT: concrete logic for equivalences *)
     | _ -> false
   in
@@ -457,11 +457,11 @@ let assumption ?(hyp : Ident.t option) (s : ES.t) : ES.t list =
           if TConfig.post_quantum_equivs (ES.table s) then
             List.length equiv = List.length conclusion &&
             List.for_all2 (fun elem1 elem2 ->
-                ES.Reduce.conv_term s elem1 elem2
+                ES.Reduce.conv_term ~global:true s elem1 elem2
               ) equiv conclusion
           else
             List.for_all (fun elem ->
-                List.exists (ES.Reduce.conv_term s elem)
+                List.exists (ES.Reduce.conv_term ~global:true s elem)
                   equiv
               ) conclusion
         | Equiv.Pred  _ -> false
@@ -805,7 +805,7 @@ let fa_select_elem_terms
       match 
         (* FIXME: switching to [concrete:false] could allow more matches.
            There is no soundness issue here, as this is not part of the TCB. *)
-        Match.T.try_match ~ienv ~param ~env ~concrete:true table system e pat 
+        Match.T.try_match ~global:true ~ienv ~param ~env ~concrete:true table system e pat 
       with
       | NoMatch _ -> None
       | Match _   -> Some i)
@@ -868,7 +868,7 @@ let fa_expand
     let system = SE.reachability_context system in
     let red_param = { Reduction.rp_empty with diff = true; } in
     
-    let st = ES.Reduce.to_state ~system red_param s in
+    let st = ES.Reduce.to_state ~global:true ~system red_param s in
 
     match fst @@ Reduction.whnf_term st t with
     | Tuple l ->
@@ -1081,7 +1081,7 @@ let fa_elem_ex
     begin
       let env = odflt (ES.vars s) oenv in
       let pc = 
-        ES.proof_context ~in_system:system s |> 
+        ES.proof_context ~global:true ~in_system:system s |> 
         ProofContext.set_vars env 
       in
       let st =
@@ -1287,7 +1287,7 @@ let is_dup
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
   in
-  let eq = ES.Reduce.conv_term ~system s in
+  let eq = ES.Reduce.conv_term ~global:true ~system s in
 
   (* check whether [t ≤ t'] (where [≤] is the standard timestamp order
      without the happens component!) *)
@@ -1359,7 +1359,7 @@ let filter_fa_dup (s : ES.t) (assump : Term.terms) (elems : Equiv.equiv) =
     if is_dup s e elems then
       (true,[])
       (* if an element is an assumption, we succeed, but do not remove it *)
-    else if List.mem_cmp ~eq:(ES.Reduce.conv_term ~system s) e assump then
+    else if List.mem_cmp ~eq:(ES.Reduce.conv_term ~global:true ~system s) e assump then
       (true,[e])
       (* otherwise, we go recursively inside the sub-terms produced by function
          application *)
@@ -1426,7 +1426,7 @@ let filter_deduce
        equivalence under target. *)
     Match.mk_unif_state
       ~param:Match.crypto_param
-      (ES.proof_context ~in_system s)
+      (ES.proof_context ~global:true ~in_system s)
       ~support:[]
   in
   let table = ES.table s in
@@ -1533,7 +1533,7 @@ let deduce_int (l : int L.located list) (s : ES.t) : ES.t list =
     let system_s = ES.system s in
     SE.{ system_s with set = ( (oget system_s.pair) :> SE.t); }
   in
-  let pc = ES.proof_context ~in_system s in
+  let pc = ES.proof_context ~global:true ~in_system s in
 
   let to_deduce, inputs = get_elems l equiv.terms in
 
@@ -1624,7 +1624,7 @@ let deduce_predicate
        equivalence under target. *)
     Match.mk_unif_state
       ~param:Match.crypto_param
-      (ES.proof_context ~in_system:system s)
+      (ES.proof_context ~global:true ~in_system:system s)
       ~support:[]
   in
 
@@ -1754,7 +1754,7 @@ let deduce_predicate_int
        equivalence under target. *)
     Match.mk_unif_state
       ~param:Match.crypto_param
-      (ES.proof_context ~in_system:system s) ~support:[]
+      (ES.proof_context ~global:true ~in_system:system s) ~support:[]
   in
 
   let side = deduce_pick_side ?side goal_kind in
@@ -1887,7 +1887,7 @@ let deduce (args : Args.parser_args) (s : ES.t) : Goal.t list =
         else
           begin
             let form, has_red =
-              ES.Reduce.reduce_head1 Reduction.rp_full s Equiv.Global_t form
+              ES.Reduce.reduce_head1 ~global:true Reduction.rp_full s Equiv.Global_t form
             in
             if has_red <> True then bad_formula ();
             as_deduction_hyp ~subgs form
@@ -2278,7 +2278,7 @@ let crypto
   let frame = ES.conclusion_as_equiv s in
   let old_system = ES.system s in
   let new_system = { old_system with set = (oget old_system.pair :> SE.t); } in
-  let context = ES.proof_context ~in_system:new_system s in
+  let context = ES.proof_context ~global:true ~in_system:new_system s in
   let subgs = Crypto.prove ~param context game args frame in
   let s = (* change the system context and hypotheses in [s] *)
     let dummy = Equiv.mk_reach_atom Term.mk_false in

@@ -24,7 +24,7 @@ module type S = sig
   val to_state :
     ?system:SE.context ->
     ?vars:Vars.env ->
-    red_param -> ?concrete:bool -> t -> state
+    red_param -> global:bool -> ?concrete:bool -> t -> state
 
   (*------------------------------------------------------------------*)
   val reduce_global :
@@ -40,7 +40,7 @@ module type S = sig
   (** Reduces once at head position *)
   val reduce_head1 :
     ?system:SE.context ->
-    red_param -> ?concrete:bool -> t -> 
+    red_param -> global:bool -> ?concrete:bool -> t -> 
     'a Equiv.f_kind -> 'a -> 'a * head_has_red
   
   (*------------------------------------------------------------------*)
@@ -67,7 +67,7 @@ module type S = sig
 
   val conv_term :
     ?system:SE.context ->
-    ?param:red_param -> ?concrete:bool ->
+    ?param:red_param -> global:bool -> ?concrete:bool ->
     t ->
     Term.term -> Term.term -> bool
 

@@ -167,7 +167,7 @@ let intctxt_param
   =
   let table = TS.table s in
 
-  let contx = TS.proof_context s in
+  let contx = TS.proof_context ~global:true s in
   let info = O.EI_direct, contx in
 
   let exception NotDec in
@@ -243,7 +243,7 @@ let intctxt
   (* Find parameters *)
   let _, hyp = TS.Hyps.by_name_k h Hyp s in
   let hyp = LT.as_local ~loc hyp in (* FIXME: allow global hyps? *)
-  let context = TS.proof_context s in
+  let context = TS.proof_context ~global:false s in
   let env = context.env in
 
   let icp = intctxt_param ~loc hyp s in

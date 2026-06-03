@@ -114,7 +114,7 @@ module type S = sig
   (** Returns the proof-context of a sequent.
       Option to change the system or concrete status. *)
   val proof_context :
-    ?in_system:SE.context -> ?concrete:bool -> t -> ProofContext.t
+    ?in_system:SE.context -> global:bool -> ?concrete:bool -> t -> ProofContext.t
 
   (** Return a set of hypotheses that are a consequence of the
       hypotheses of the sequent, and are taken in the system context

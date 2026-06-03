@@ -211,7 +211,7 @@ let occurrence_kind
     bound above the matched occurrences are universally quantified in
     the generated sub-goals. *)
 let rewrite_instance
-    ~(param : Match.param) ~(concrete:bool)
+    ~(param : Match.param) ~global ~(concrete:bool)
     (table : Symbols.table) (params : Params.t)
     (env : Vars.env) (hyps : Hyps.TraceHyps.hyps) 
     (rule : rw_rule)
@@ -235,7 +235,7 @@ let rewrite_instance
         let op_rule = open_rw_rule table rule se in
         let res_match =
           Match.T.try_match
-            ~param ~concrete
+            ~param ~global ~concrete
             ~ienv:op_rule.ienv
             ~hyps ~env table context occ op_rule.pat
         in
@@ -331,7 +331,7 @@ let rewrite_instance
         begin
           match 
             Match.T.try_match
-              ~param ~concrete
+              ~param ~global ~concrete
               ~ienv ~hyps ~env table context occ inst.pat 
           with
           | NoMatch _ -> s, `Continue
@@ -381,7 +381,7 @@ let rewrite_instance_in_global
        (occ_kind = `Asym     && asym_rule) 
     then
       rewrite_instance
-        ~param ~concrete table params env hyps rule 
+        ~param ~global:true ~concrete table params env hyps rule 
         occ se vars conds _p () s
     else (s, `Continue) 
   in
@@ -392,7 +392,7 @@ let rewrite_instance_in_global
 
 (** Exported *)
 let rewrite_head
-    ~(param : Match.param) ~(concrete : bool)
+    ~(param : Match.param) ~global ~(concrete : bool)
     (table  : Symbols.table)
     (params : Params.t)
     (env    : Vars.env)
@@ -403,7 +403,7 @@ let rewrite_head
   =
   assert (rule.rw_kind = Global);
   match 
-    rewrite_instance
+    rewrite_instance ~global
       ~param ~concrete table params env hyps rule
       t sexpr [] [] Pos.root () `False 
   with
@@ -469,7 +469,7 @@ let do_rewrite
       | Local t -> 
         let s, _, t = 
           Pos.map_fold
-            (rewrite_instance ~param ~concrete table params env hyps rule) 
+            (rewrite_instance ~global:false ~param ~concrete table params env hyps rule) 
             system.set s t
         in
         s, Equiv.Local t

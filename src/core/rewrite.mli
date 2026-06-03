@@ -13,6 +13,7 @@ type error =
     Return: rewritten term, proof obligations *)
 val rewrite_head :
   param:Match.param ->
+  global:bool ->
   concrete:bool ->
   Symbols.table ->
   Params.t ->

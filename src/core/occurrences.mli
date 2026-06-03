@@ -184,6 +184,7 @@ module type SimpleOcc = sig
       In principle it should be fine, if not just give
       a different occ_formula that doesn't simplify anything. *)
   val aux_occ_incl :
+    global:bool ->
     concrete:bool ->
     Symbols.table -> SE.fset -> ?mv:Match.Mvar.t ->
     simple_occ -> simple_occ -> Match.Mvar.t option
@@ -198,12 +199,14 @@ module type SimpleOcc = sig
       in an instance of its action, with a STRONGER condition
        (not weaker, watch out we've made that mistake before) *)
   val occ_incl :
+    global:bool ->
     concrete:bool ->
     Symbols.table -> SE.fset ->
     simple_occ -> simple_occ -> bool
 
   (** Removes subsumed occurrences from a list *)
   val clear_subsumed :
+    global:bool ->
     concrete:bool ->
     Symbols.table -> SE.fset ->
     simple_occs -> simple_occs
@@ -271,12 +274,14 @@ module type ExtOcc = sig
       Checks if all instances of [occ1] are instances of [occ2]
       (ie [occ2] subsumes [occ1]). *)
   val ext_occ_incl :
+    global:bool ->
     concrete:bool ->
     Symbols.table -> SE.fset ->
     ext_occ -> ext_occ -> bool
 
   (** Removes subsumed extended occurrences from a list *)
   val clear_subsumed :
+    global:bool ->
     concrete:bool ->
     Symbols.table -> SE.fset ->
     ext_occs -> ext_occs

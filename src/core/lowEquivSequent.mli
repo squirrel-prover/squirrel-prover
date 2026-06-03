@@ -81,7 +81,7 @@ val conclusion_as_computability : t -> ComputePredicates.form
 
 (** constructs a proof-context for the system context whose [set] is
     the sequent's [pair] *)
-val pair_proof_context : sequent -> ProofContext.t
+val pair_proof_context : global:bool -> sequent -> ProofContext.t
 
 (** fails if the goal is not an equivalence *)
 val check_conclusion_is_equiv : sequent -> unit

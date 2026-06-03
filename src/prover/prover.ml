@@ -450,9 +450,9 @@ let search_about
         let sys = g.stmt.system in 
         let res = begin match g.stmt.formula with
         | GlobalS f -> 
-          Match.E.find ~param ~concrete:false env.table sys pat f
+          Match.E.find ~param ~global:false ~concrete:false env.table sys pat f
         | LocalS  f -> 
-          Match.T.find ~param ~concrete:false env.table sys pat f.formula
+          Match.T.find ~param ~global:false ~concrete:false env.table sys pat f.formula
         end in
         begin match res with
           | [] -> acc

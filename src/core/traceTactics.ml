@@ -141,7 +141,10 @@ let conditional_case
     begin
       let def =
         let res, has_red =
-          Match.reduce_delta_macro1 ~constr:true (TS.proof_context s) m
+          Match.reduce_delta_macro1 ~constr:true
+            (* we are doing a case over a local formula, hence, we
+               keep local formulas. *)
+            (TS.proof_context ~global:false s) m
         in
         if has_red = True then res else failed ()
 
@@ -258,8 +261,10 @@ let rec simpl_left (s : TS.t) =
           | C.ReachAsym -> None
           | ReachConc e ->
             let state =
+              (* We are reducing in local formulas, hence global:false. *)
               Reduction.mk_state0
                 ~system:(TS.system s)
+                ~global:false
                 ~red_param:Reduction.rp_default
                 (TS.table s) ~concrete:true
             in
@@ -321,22 +326,23 @@ let assumption ?hyp (s : TS.t) =
     | TopHyps.LHyp (Equiv.Global (Equiv.Atom (Reach {formula = f; bound}))) ->
 
       bound_entail sbound bound &&
-      (TS.Reduce.conv_term s conclusion f  ||
+      (* ~global:true, as we are rewriting in a global context. *)
+      (TS.Reduce.conv_term ~global:true s conclusion f  ||
        (*In the case where there not argument is given to the tactic,
           check if the formula [f] is a conjunction where one of the sub-formula is the conclusion.
          When an argument is given to the function, the tactics
          does not perform such automatisation for testing purposes *)
        (List.exists (fun f ->
-            TS.Reduce.conv_term s conclusion f ||
-            TS.Reduce.conv_term s f Term.mk_false
+            TS.Reduce.conv_term ~global:true s conclusion f ||
+            TS.Reduce.conv_term ~global:true s f Term.mk_false
           ) (Term.decompose_ands f)) && hyp = None)
 
     | TopHyps.LHyp (Equiv.Local f) ->
 
-      (TS.Reduce.conv_term s conclusion f  ||
+      (TS.Reduce.conv_term ~global:false s conclusion f  ||
        ( List.exists (fun f ->
-             TS.Reduce.conv_term s conclusion f ||
-             TS.Reduce.conv_term s f Term.mk_false
+             TS.Reduce.conv_term ~global:false s conclusion f ||
+             TS.Reduce.conv_term ~global:false s f Term.mk_false
            ) (Term.decompose_ands f) && hyp = None) )
       &&
       (*In the case of a local assumption begin used,
@@ -454,6 +460,27 @@ let rewrite_equiv_transform
       (TS.get_trace_hyps s)
   in
 
+  let hyps =
+    (* As we will use the hypothesis to do a matching over global
+       hypothesis, we would drop the local hypothesis. However,
+       rewrite_equiv has already filtered out some hypothesis, and
+       kept the ones that are const, and are thus in fact global. That
+       is `Const(phi) -> ([phi => psi] <-> ([phi] -> [psi])`, and we
+       can thus keep the local remaining local hypothesis. To be safe,
+       we still recheck the const flag.
+       
+       FEAT: we could in fact do this lifting automatically in
+       Hyps.get_globals.  *)
+    Hyps.TraceHyps.map
+      ~hyp:(
+        fun h -> match h with
+          | Local t when HighTerm.is_constant env t ->
+            Global (Atom (Reach Equiv.{formula= t; bound=None}))
+          | u -> u
+      )
+      hyps
+  in
+
   (** Take a term [t] over [src] and:
       1) lift it as a term over [system] 
          (which is [(src,dst)] or [(dst,src)]);
@@ -480,7 +507,7 @@ let rewrite_equiv_transform
   let assoc (t : Term.term) : Term.term option =
     match
       List.find_opt
-        (fun e -> TS.Reduce.conv_term s (Term.project1 src_proj e) t)
+        (fun e -> TS.Reduce.conv_term ~global:true s (Term.project1 src_proj e) t)
         biframe
     with
     | Some e -> Some (Term.project1 dst_proj e)
@@ -528,8 +555,10 @@ let rewrite_equiv ~loc (ass_context,ass,dir) (s : TS.t) : TS.t list =
       | Equiv.(Atom (Equiv bf)) -> [],bf
       | Impl (Atom (Reach f),g) -> let s,bf = aux g in f::s,bf
       | _ as f -> 
-        let f, has_red = 
-          TS.Reduce.reduce_head1
+        let f, has_red =
+          (* We are reducing the global hypothesis, hence, only global
+             hypothesis allowed. *)
+          TS.Reduce.reduce_head1 ~global:true
             ~system:ass_context Reduction.rp_full s Equiv.Global_t f 
         in
         if has_red = True then aux f else soft_failure ~loc (Failure "invalid assumption")
@@ -686,7 +715,9 @@ let congruence (s : TS.t) : bool =
       let reduce_bound_any_form (f : Equiv.any_form) =
         match f with
         | Global Equiv.(Atom (Reach {formula = f; bound = Some b}))  ->
-          let redb = Reduction.reduce_term state b in
+          (* Here, we are reducing under a global hypothesis, only
+             global hypothesis kepy. *)
+          let redb = Reduction.reduce_term (state ~global:true) b in
           Equiv.Global Equiv.(Atom (Reach {formula = f; bound = Some redb}))
         | _ -> f
       in
@@ -696,7 +727,7 @@ let congruence (s : TS.t) : bool =
   match TS.bound s with
   | C.ReachAsym -> cong
   | ReachConc e ->
-    let rede = Reduction.reduce_term state e in
+    let rede = Reduction.reduce_term (state ~global:false) e in
     cong && (Real.ge_zero table rede)
   | _ -> assert false
 
@@ -718,6 +749,7 @@ let constraints (s : TS.t) =
   let state =
     Reduction.mk_state0
       ~system
+      ~global:false
       ~red_param:Reduction.rp_default
       (TS.table s) ~concrete:true
   in
@@ -1154,7 +1186,7 @@ let fa (bounds : Term.term option list) s =
     when f = Term.f_ite && f' = Term.f_ite ->
     let subgoals =
       let open TraceSequent in
-      let cond_conv = Reduce.conv_term s c c' in
+      let cond_conv = Reduce.conv_term ~global:false s c c' in
       (* if condition are not convertible, check that [c <=> c'] *)
       (
         if not cond_conv then
@@ -1237,7 +1269,7 @@ let fa (bounds : Term.term option list) s =
               vars e
         in
         let sleq =
-          if TS.Reduce.conv_term s b e
+          if TS.Reduce.conv_term ~global:false s b e
           then []
           else
             let sleq =
@@ -1343,14 +1375,14 @@ let fa (bounds : Term.term option list) s =
     check_args fargs gargs;
 
     let equal_fun =
-      if Reduce.conv_term s f g then [] else [set_conclusion (Term.mk_eq f g) s]
+      if Reduce.conv_term ~global:false s f g then [] else [set_conclusion (Term.mk_eq f g) s]
     in
     let subgoals =
       equal_fun @
       List.flatten
         (List.map2
            (fun x y ->
-              if Reduce.conv_term s x y then []
+              if Reduce.conv_term ~global:false s x y then []
               else [set_conclusion (Term.mk_eq x y) s]
            ) fargs gargs)
     in
@@ -1622,7 +1654,7 @@ let valid_hash (context : ProofContext.t) (t : Term.term) =
 (** We collect all hashes appearing inside the hypotheses, and which satisfy
     the syntactic side condition. *)
 let top_level_hashes s =
-  let context = TS.proof_context s in
+  let context = TS.proof_context ~global:false s in
 
   let hashes =
     List.filter (valid_hash context) (TS.get_all_messages s)
@@ -1668,7 +1700,7 @@ let collision_resistance TacticsArgs.(Opt (String, arg)) (s : TS.t) =
       let h = as_local ~loc:(L.loc p_h) h in
       match TS.Reduce.destr_eq s Local_t h with
       | Some (t1, t2) ->
-        let context = TS.proof_context s in
+        let context = TS.proof_context ~global:false s in
         if not (valid_hash context t1) || not (valid_hash context t2) then
           soft_failure Tactics.NoSSC;
 

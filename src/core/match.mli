@@ -334,6 +334,7 @@ module type S = sig
       unchanged (it is reset). *)
   val try_match :
     param:param ->
+    global:bool ->
     concrete:bool ->
     ?mv:Mvar.t ->
     ?env:Vars.env ->            (* used to get variables tags *)
@@ -349,6 +350,7 @@ module type S = sig
       pattern. *)
   val find : 
     param:param ->
+    global:bool ->
     concrete:bool ->
     ?ienv:Infer.env ->
     ?in_system:SE.t ->
@@ -375,7 +377,7 @@ val reduce_delta_def1 :
 
 (** Perform δ-reduction once for macro at head position. *)
 val reduce_delta_macro1 :
-  ?unfold_opaque:bool ->
+  ?unfold_opaque:bool ->  
   constr:bool ->
   ProofContext.t ->
   Term.term ->
@@ -480,7 +482,7 @@ val deduce_terms :
     amounts to checking whether we can establish that [hyp ⇒ cond]. *)
 val known_set_check_impl :
   ?st:unif_state ->
-  ?mv:Mvar.t ->
+  ?mv:Mvar.t ->  
   Symbols.table ->
   Term.term -> Term.term ->
   [`Failed | `Ok of Mvar.t option]
@@ -493,6 +495,23 @@ module T : S with type t = Term.term
 module E : sig
   include S with type t = Equiv.form
 
+(* We overwrite the try_match type to remove the ~global flag: when
+   matching inside a global formula, we are always in a global
+   context. *)
+  val try_match :
+    param:param ->
+    concrete:bool ->
+    ?mv:Mvar.t ->
+    ?env:Vars.env ->            (* used to get variables tags *)
+    ?ienv:Infer.env ->
+    ?hyps:Hyps.TraceHyps.hyps ->
+    Symbols.table ->
+    SE.context -> 
+    t -> 
+    t Term.pat_op ->
+    match_res
+
+  
   (** Similar as [find], but over [Equiv.form] sub-terms. *)
   val find_glob : 
     param:param -> 

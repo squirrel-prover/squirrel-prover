@@ -311,7 +311,7 @@ let cgdh
   let ppe = default_ppe ~table:(TS.table s) () in
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc:(L.loc m) hyp in (* FIXME: allow global hyps? *)
-  let context = TS.proof_context s in
+  let context = TS.proof_context ~global:false s in
 
   let (gen, exp_s, mult_s, t, na, nb) =
     dh_param ~concrete ~hyp_loc:(L.loc m) ~gdh_oracles context hyp g s

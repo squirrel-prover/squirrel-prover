@@ -23,11 +23,20 @@ val tag : t -> int
 val equal_fields : t -> t -> bool
 
 (*------------------------------------------------------------------*)
-val make : env:Env.t -> hyps:TraceHyps.hyps -> concrete:bool -> t
+(* Makes a proof context. if [global] is true, the proof context is
+   meant to be used to reason under global predicates, in which case,
+   only global hypothesis in hyps are kept. *) 
+val make : env:Env.t -> hyps:TraceHyps.hyps ->
+  global:bool -> concrete:bool -> t
 
 (*------------------------------------------------------------------*)
+
+(* Invariant: for all the following functions, we assumed that t was
+   initialized with the correct ~global field in the first call to
+   make. *)
+
 (** Change the system of a proof-context, dropping hypotheses if
-    needed (see [Hyps.change_trace_hyps_context]). *)
+    needed (see [Hyps.change_trace_hyps_context]). *)  
 val change_system : system:SE.context -> t -> t
 
 val set_env      : Env.t               -> t -> t

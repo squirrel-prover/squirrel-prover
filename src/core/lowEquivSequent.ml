@@ -395,7 +395,7 @@ let get_models ~concrete (system : 'a SE.expr option) (s : t) =
   let s = to_trace_sequent (set_reach_conclusion Term.mk_false s) in
   TS.get_models ~concrete system s
 
-let proof_context ?(in_system : SE.context option) ?concrete (s : t) =
+let proof_context ?(in_system : SE.context option) ~global ?concrete (s : t) =
   let env =
     match in_system with
     | None -> s.env
@@ -403,14 +403,14 @@ let proof_context ?(in_system : SE.context option) ?concrete (s : t) =
   in
   let concrete = odflt (concrete_ s) concrete in
   ProofContext.make
-    ~env ~concrete
+    ~env ~global ~concrete
     ~hyps:(get_trace_hyps ~in_system:env.system s)
 
-let pair_proof_context (s : sequent) : ProofContext.t =
+let pair_proof_context ~global (s : sequent) : ProofContext.t =
   let in_system = 
     { s.env.system with set = (oget s.env.system.pair :> SE.t) ; } 
   in
-  proof_context ~in_system s 
+  proof_context ~in_system ~global s 
     
 (*------------------------------------------------------------------*)
 let query_happens ~concrete ~precise (s : t) (a : Term.term) =

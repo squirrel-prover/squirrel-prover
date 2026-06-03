@@ -255,7 +255,7 @@ let pp_layout ppf (layout : Term.term list list) =
 
 (** Print the data for the visualisation of the trace sequent [j] in JSON format. *)
 let pp ppf j =
-  let cntxt = LowTraceSequent.proof_context j in
+  let cntxt = LowTraceSequent.proof_context ~global:false j in
   let models = LowTraceSequent.get_models None j ~concrete:false in
   (* FIXME: the value of [concrete] could be incorrect *)
   let terms = get_classes_rep models (get_timestamps j) in

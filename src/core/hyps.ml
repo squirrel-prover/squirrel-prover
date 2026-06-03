@@ -510,7 +510,6 @@ module TraceHyps = Mk(struct
           sort ^ ord
   end)
 
-
 let get_models
     ?(exn = Tactics.Tactic_hard_failure (None,TacTimeout))
     ~(concrete:bool)
@@ -734,6 +733,16 @@ let setup_change_hyps_context
   in
 
   update_local, update_global
+
+let get_globals =
+  let is_global (f : TraceHyps.ldecl ) = 
+    match f with
+    | (_, LHyp (Global _)) -> true
+    | (_, LDef _) -> true
+    | _ -> false
+  in
+  TraceHyps.filter is_global
+
 
 (*------------------------------------------------------------------*) 
 (** See `.mli` *)

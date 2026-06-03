@@ -85,8 +85,10 @@ let entails table system b1 b2 =
     (val ReductionCore.Register.get ())
   in
   let state =
+    (* we use the reduction state to reduce under global hypothesis,
+       hence we filter out local hypothesis. *)
     R.mk_state0
-      ~system ~red_param:ReductionCore.rp_default ~concrete:true
+      ~system ~global:true ~red_param:ReductionCore.rp_default ~concrete:true
       table
   in
   match b1,b2 with

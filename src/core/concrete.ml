@@ -6,6 +6,7 @@ include LowConcrete
 let reduce_bound table system (s : bound) : bound =
   let state =
     Reduction.mk_state0
+      ~global:true
       ~system ~red_param:ReductionCore.rp_default ~concrete:true
       table
   in
@@ -117,6 +118,7 @@ module BoundManagement (S : Sequent.S) = struct
     let state =
       Reduction.mk_state0
         ~hyps:(S.get_trace_hyps s)
+        ~global:true
         ~system ~red_param:ReductionCore.rp_default ~concrete:true
         (S.table s)
     in

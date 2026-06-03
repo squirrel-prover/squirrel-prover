@@ -202,7 +202,7 @@ let fresh_trace
   let _, hyp = TS.Hyps.by_name_k m Hyp s in
   let hyp = as_local ~loc hyp in (* FIXME: allow global hyps? *)
   try
-    let context = TS.proof_context s in
+    let context = TS.proof_context ~global:false s in
     let ppe = default_ppe ~table:context.env.table () in    
     let (n, t) =
       fresh_trace_param ~hyp_loc:(L.loc m) (O.EI_direct, context) hyp s
@@ -320,7 +320,7 @@ let phi_fresh_pair
   let phi_fresh_proj proj =
     let se = SE.project [proj] system in
     let system = {env.system with set=(se :> SE.arbitrary)} in
-    let context = ES.proof_context ~in_system:system s in
+    let context = ES.proof_context ~global:true ~in_system:system s in
 
     phi_fresh_proj
       ~use_path_cond ~loc
@@ -336,7 +336,7 @@ let phi_fresh_pair
 
   (* Removing duplicates. We already did that for occurrences, but
      only within [phi_l] and [phi_r], not across both *)
-  List.remove_duplicate (ES.Reduce.conv_term s) (phi_l @ phi_r)
+  List.remove_duplicate (ES.Reduce.conv_term ~global:true s) (phi_l @ phi_r)
 
 
 (** Constructs the sequent where goal [i], when of the form [diff(n_l, n_r)],
@@ -408,7 +408,7 @@ let freshR_secrecy
   Printer.pr "@[<v 0>Freshness conditions:@; @[<v 0>";
   let phis =
     let system = {env.system with set=(system :> SE.arbitrary)} in
-    let context = ES.proof_context ~in_system:system s in
+    let context = ES.proof_context ~global:true ~in_system:system s in
 
     phi_fresh
       ~negate:true ~use_path_cond ~checklarge:true
@@ -466,7 +466,7 @@ let freshL_secrecy
   Printer.pr "@[<v 0>Freshness conditions:@; @[<v 0>";
   let phis =
     let system = {env.system with set=(system :> SE.arbitrary)} in
-    let context = ES.proof_context ~in_system:system s in
+    let context = ES.proof_context ~global:true ~in_system:system s in
 
     phi_fresh
       ~negate:true ~use_path_cond ~checklarge:true ~loc

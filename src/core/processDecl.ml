@@ -746,7 +746,8 @@ module PatternMatching = struct
           in
           let env = Env.init ~table ?system ~se_vars () in
           let pc =
-            ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty ~concrete:true
+            (* ~global is irrelevant with an empty hyps. *)
+            ProofContext.make ~env ~hyps:Hyps.TraceHyps.empty ~global:false ~concrete:true
           in
           Reduction.mk_state pc ~red_param:Reduction.rp_full
         )

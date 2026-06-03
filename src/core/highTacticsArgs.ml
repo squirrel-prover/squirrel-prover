@@ -28,11 +28,11 @@ let occurrences_of_pat
   let res : Term.terms = 
     match target with
     | Local  form -> 
-      Match.T.find
+      Match.T.find ~global:false
         ~param ~concrete ?in_system ~ienv env.table env.system 
         pat form
     | Global form -> 
-      Match.E.find
+      Match.E.find ~global:true
         ~param ~concrete ?in_system ~ienv env.table env.system 
         pat form
   in

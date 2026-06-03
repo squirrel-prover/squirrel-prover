@@ -199,6 +199,8 @@ val get_models :
   TraceHyps.hyps ->
   Constr.models
 
+val get_globals : TraceHyps.hyps -> TraceHyps.hyps
+  
 (*------------------------------------------------------------------*)
 (** {2 Changing the context of a set of hypotheses} *)
 

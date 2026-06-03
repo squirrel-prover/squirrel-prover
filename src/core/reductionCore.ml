@@ -143,6 +143,7 @@ module type Sig = sig
     ?params:Params.t ->
     system:SE.context ->
     ?vars:Vars.env ->
+    global:bool ->
     concrete:bool ->
     red_param:red_param -> 
     Symbols.table -> 

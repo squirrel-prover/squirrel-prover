@@ -273,7 +273,7 @@ let euf (h : lsymb) (bounds : Term.t option list) (s : sequent) : sequent list =
   
   let _, hyp = TS.Hyps.by_name_k h Hyp s in
   let hyp = as_local ~loc:(L.loc h) hyp in (* FIXME: allow global hyps? *)
-  let context = TS.proof_context s in
+  let context = TS.proof_context ~global:false s in
 
   let {ep_key=k; ep_intmsg=m; ep_term=t; ep_int_f=int_f; ep_pk_f=pk_f} =
     euf_param ~hyp_loc:(L.loc h) context hyp s

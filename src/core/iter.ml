@@ -552,7 +552,7 @@ end = struct
     in
     let system = SE.reachability_context sexpr in
     match
-      Match.T.try_match
+      Match.T.try_match ~global:false
         ~param:Match.default_param ~concrete:true
         table system term1 pat2
     with
@@ -702,7 +702,7 @@ let is_valid_qatt_occ (context : ProofContext.t) t =
   let table  = context.env.table  in
   let system = context.env.system in  
    match 
-     Match.T.try_match
+     Match.T.try_match ~global:false
        ~param:Match.crypto_param ~concrete:true table system 
        t qatt_pat 
    with

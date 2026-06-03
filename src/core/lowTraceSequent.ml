@@ -229,7 +229,7 @@ let get_models ~(concrete:bool) (system : 'a SE.expr option) (s : sequent) =
   let rp = Reduction.rp_default in
   let red_state =
     Reduction.mk_state0
-      ~system:s.env.system ~red_param:rp s.env.table ~concrete
+      ~system:s.env.system ~global:false ~red_param:rp s.env.table ~concrete
   in
   let red_fun = Reduction.reduce_term red_state in
   Hyps.get_models ~concrete s.env.table ~red_fun ~system s.proof_context
@@ -272,6 +272,7 @@ let query ?(system : SE.arbitrary option = None) ~precise ~concrete s q =
 (** Exported versions of query and its alternatives. *)
 
 let query_happens ~concrete ~precise s a =
+  (* Here, we are testing if happens a is true, we can keep local hypothesis. *)
   query ~concrete ~precise s (Some [Term.mk_happens a])
 
 let constraints_valid ?(system : 'a SE.expr option = None) s =
@@ -529,7 +530,7 @@ let eq_atoms_valid s =
     neqs
 
 (*------------------------------------------------------------------*)
-let proof_context ?(in_system : SE.context option) ?concrete (s : t) =
+let proof_context ?(in_system : SE.context option) ~global ?concrete (s : t) =
   let env =
     match in_system with
     | None -> s.env
@@ -537,7 +538,7 @@ let proof_context ?(in_system : SE.context option) ?concrete (s : t) =
   in
   let concrete = odflt (concrete_ s) concrete in
   ProofContext.make
-    ~env ~concrete
+    ~env ~global ~concrete
     ~hyps:(get_trace_hyps ~in_system:env.system s)
 
 (*------------------------------------------------------------------*)

@@ -24,8 +24,14 @@ let[@warning "+9"] equal_fields t t' =
 (*------------------------------------------------------------------*)
 let cpt = ref 0
 
-let make ~env ~hyps ~concrete =
+let make ~env ~hyps ~global ~concrete =
   incr cpt;
+  let hyps =
+    if not global then hyps else
+      (* if we are creating a proof context for reasoning in a global
+         predicate, we dropt the local hypothesis. *)
+      Hyps.get_globals hyps
+  in
   { env; hyps; concrete; tag = !cpt; }
 
 (*------------------------------------------------------------------*)
@@ -39,22 +45,22 @@ let change_system ~(system : SE.context) (t : t) : t =
       t.hyps
   in
   let env = { t.env with system; } in
-  make ~env ~hyps ~concrete:t.concrete
+  make ~env ~hyps ~concrete:t.concrete ~global:false
 
 (*------------------------------------------------------------------*)
 let set_env (env : Env.t) (t : t) : t =
-  make ~env ~hyps:t.hyps ~concrete:t.concrete
+  make ~env ~hyps:t.hyps ~global:false ~concrete:t.concrete
 
 let set_hyps (hyps : Hyps.TraceHyps.hyps) (t : t) : t =
-  make ~env:t.env ~hyps ~concrete:t.concrete
+  make ~env:t.env ~hyps ~global:false ~concrete:t.concrete
 
 let set_vars (vars : Vars.env) (t : t) : t =
   let env = Env.set_vars t.env vars in
-  make ~env ~hyps:t.hyps ~concrete:t.concrete
+  make ~env ~hyps:t.hyps ~global:false ~concrete:t.concrete
 
 let set_table (table : Symbols.table) (t : t) : t =
   let env = Env.set_table t.env table in
-  make ~env ~hyps:t.hyps ~concrete:t.concrete
+  make ~env ~hyps:t.hyps ~global:false ~concrete:t.concrete
 
 let set_concrete (concrete : bool) (t : t) : t =
-  make ~env:t.env ~hyps:t.hyps ~concrete 
+  make ~env:t.env ~hyps:t.hyps ~global:false ~concrete 

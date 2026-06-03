@@ -480,6 +480,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let unfold_term_exn
       ~(unfold_opaque : bool)
       ~(force_exhaustive:bool)
+      ~global
       ~concrete
       (t       : Term.term)
       (se      : SE.arbitrary)
@@ -492,7 +493,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     let env   = S.env   s in
     let new_context = { (S.system s) with set = (se :> SE.t); } in
 
-    let pc = lazy (S.proof_context ~in_system:new_context s) in
+    let pc = lazy (S.proof_context ~in_system:new_context ~global s) in
 
     (* expand a macro into the exhaustive list of cases *)
     let expand_full = function
@@ -502,7 +503,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           let rp = Reduction.rp_default in
           let red_state =
             Reduction.mk_state0
-              ~system:(S.system s) ~red_param:rp ~concrete table
+              ~system:(S.system s) ~red_param:rp ~global ~concrete table
           in
           let red_fun = Reduction.reduce_term red_state in
           let models =
@@ -555,6 +556,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
   let unfold_local
       ~(force_exhaustive:bool)
       ~(unfold_opaque : bool)
+      ~global
       ~concrete
       ~(strict : bool)
       (t       : Term.term)
@@ -565,7 +567,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     try
       Some (
         unfold_term_exn
-          ~unfold_opaque ~concrete ~force_exhaustive
+          ~unfold_opaque ~global ~concrete ~force_exhaustive
           t se s) 
     with
     | Tactics.Tactic_soft_failure _ when not strict -> None
@@ -637,10 +639,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     (* unfold in local sub-terms *)
-    let unfold_term (se : SE.arbitrary) (occ : Term.term) (s : S.t) =
+    let unfold_term ~global (se : SE.arbitrary) (occ : Term.term) (s : S.t) =
       match
         unfold_local
-          ~unfold_opaque:(not is_rec) ~concrete ~force_exhaustive ~strict occ se s 
+          ~unfold_opaque:(not is_rec) ~global ~concrete ~force_exhaustive ~strict occ se s 
       with
       | None -> `Continue
       | Some t ->
@@ -661,7 +663,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     (* expands in local sub-terms *)
-    let expand_inst : _ Match.Pos.f_map =
+    let expand_inst ~global : _ Match.Pos.f_map =
       fun occ se _vars conds _p _info ->
         match occ with
         | Term.Macro (ms, _, _) ->
@@ -675,20 +677,20 @@ module MkCommonLowTac (S : Sequent.S) = struct
                   S.Hyps.add AnyName (LHyp (S.unwrap_hyp (Local cond))) s
                 ) s conds
             in
-            unfold_term se occ s
+            unfold_term ~global se occ s
           else
             `Continue
 
         | Term.Var v ->
           if found_occ_def target v.id then
-            unfold_term se occ s
+            unfold_term ~global se occ s
           else
             `Continue
 
         | Term.Fun (f, _) 
         | Term.App (Fun (f, _), _) ->
           if found_occ_fun target f then
-            unfold_term se occ s
+            unfold_term ~global se occ s
           else
             `Continue
 
@@ -712,7 +714,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Global f ->
       let _, f =
         Match.Pos.map_e
-          ~mode:(`TopDown is_rec) expand_inst   system f 
+          ~mode:(`TopDown is_rec) (expand_inst ~global:true)   system f 
       in
       let _, f =
         Match.Pos.map_g
@@ -723,7 +725,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     | Local f ->
       let _, f =
         Match.Pos.map
-          ~mode:(`TopDown is_rec) expand_inst system.set f
+          ~mode:(`TopDown is_rec) (expand_inst ~global:false) system.set f
       in
       !found1, Local f
 
@@ -1023,7 +1025,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
                by replacing [(∀ x. u = v) → ⊤] with [u → v] (where
                [x] must be inferred). *)
             if Term.equal r Term.mk_true then
-              let state = S.Reduce.to_state ~system Reduction.rp_full s in
+              let global = (tgt_kind = `Global) in
+              let state = S.Reduce.to_state ~global ~system Reduction.rp_full s in
               let l, has_red = Reduction.whnf_term state l in
               if has_red then
                 let args, l = Term.decompose_forall_tagged l in
@@ -1606,7 +1609,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       | None       -> form :: acc 
     in
 
-    let rec doit_cases (form : S.hyp_form) : S.hyp_form list * bool =
+    let rec doit_cases ~global (form : S.hyp_form) : S.hyp_form list * bool =
       match nb with
       | `Any -> 
         (doit_case [] form, hyp_is_global_or form)
@@ -1614,10 +1617,10 @@ module MkCommonLowTac (S : Sequent.S) = struct
         match S.Hyp.destr_ors ~env:(S.env s) l form with
         | None -> 
           let form, has_red = 
-            S.Reduce.reduce_head1 Reduction.rp_full s S.hyp_kind form 
+            S.Reduce.reduce_head1 ~global Reduction.rp_full s S.hyp_kind form 
           in
           if has_red = True then 
-            doit_cases form
+            doit_cases ~global form
           else destr_err ()
         | Some cases ->
           (cases, hyp_is_global_or form)
@@ -1626,8 +1629,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
     (* FEATURE: let: case analys on definitions *)
     let form = Hyps.by_id_k id Hyp s in
     let s = Hyps.remove id s in
-
-    let cases, global = doit_cases form in
+    let hyp_is_local =
+      match S.hyp_kind, form with
+      | Equiv.Any_t, Local _ -> true
+      | _ -> false
+    in
+    let cases, global = doit_cases ~global:(not hyp_is_local) form in
 
     if List.length cases = 1 then destr_err ();
 
@@ -2115,7 +2122,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
     (* Try all destruct function on [form].
        If all fail, reduce [form] once and recurse. *)
-    let rec doit (form : S.hyp_form) destr_list = 
+    let rec doit (form : S.hyp_form) destr_list =
+      let hyp_is_local =
+        match S.hyp_kind, form with
+        | Equiv.Any_t, Local _ -> true
+        | _ -> false
+      in      
       match destr_list with
       | try_destr :: destr_list ->
         begin
@@ -2125,7 +2137,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       | [] ->
         let form, has_red = 
-          S.Reduce.reduce_head1 Reduction.rp_full s S.hyp_kind form 
+          S.Reduce.reduce_head1 ~global:(not hyp_is_local) Reduction.rp_full s S.hyp_kind form 
         in
         if has_red = True then 
           doit form init_destr_list (* start again *)
@@ -2295,8 +2307,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
         end
 
       else
+        let conc_is_local =
+          match S.conc_kind, form with
+          | Equiv.Any_t, Local _ -> true
+          | _ -> false
+        in
         let form, has_red = 
-          S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind form 
+          S.Reduce.reduce_head1 ~global:(not conc_is_local) Reduction.rp_full s S.conc_kind form 
         in
         if has_red = True then 
           doit form
@@ -2361,9 +2378,14 @@ module MkCommonLowTac (S : Sequent.S) = struct
           `Def (v', Vars.name v, HighTerm.tags_of_term (S.env s) t1), s
         end
 
-      else 
+      else
+        let conc_is_local =
+          match S.conc_kind, form with
+          | Equiv.Any_t, Local _ -> true
+          | _ -> false
+        in
         let form, has_red = 
-          S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind form 
+          S.Reduce.reduce_head1 ~global:(not conc_is_local) Reduction.rp_full s S.conc_kind form 
         in
         if has_red = True then 
           doit form
@@ -2776,6 +2798,12 @@ module MkCommonLowTac (S : Sequent.S) = struct
     : Goal.t list
     =
     let concrete = S.concrete s in
+    let global =
+      match S.conc_kind with
+      | Local_t  -> false
+      | Global_t -> true
+      | Any_t -> assert false (* cannot happen *)          
+    in
     let param =
       { Match.logic_param with mode = `EntailRL; use_fadup; }
     in
@@ -2824,7 +2852,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       let match_concl =
         match S.conc_kind with
         | Local_t  ->
-          Match.T.try_match
+          Match.T.try_match ~global:false
             ~param ~concrete ~ienv ~hyps table ~env:vars system 
             conclusion pat
 
@@ -2852,7 +2880,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
         (* [pat] and the judgement are concrete *)
         | Some e, ReachConc ve ->
           (* try to match the bound *)
-          Match.T.try_match
+          Match.T.try_match ~global
             ~param ~concrete ~mv ~ienv ~hyps table
             ~env:vars system e {opat with pat_op_term = ve}
   
@@ -2923,7 +2951,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
 
       else
         let t, has_red =
-          S.Reduce.reduce_head1 Reduction.rp_full s S.conc_kind pat.pat_op_term
+          S.Reduce.reduce_head1 ~global Reduction.rp_full s S.conc_kind pat.pat_op_term
         in
         if has_red <> True then
           (* match failed and [pat] cannot be reduced: user-level error *)
@@ -3079,7 +3107,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
           | Any_t, Local hconcl, Local fprem ->
             assert (bound <> Glob);
             let pat = { pat with pat_op_term = fprem } in
-            Match.T.try_match 
+            Match.T.try_match ~global:false
               ~param ~concrete ~ienv table ~env:(S.vars s) system 
               hconcl pat
               
@@ -3629,7 +3657,13 @@ module MkCommonLowTac (S : Sequent.S) = struct
         end
       | ReachAsym -> soft_failure (Failure "Not a concrete hypothesis")
     in
-    if S.Reduce.conv_term s ve (Library.Real.mk_zero (S.table s))
+    let conc_is_local =
+      match S.hyp_kind, concl with
+      | Equiv.Any_t, Local _ -> true
+      | _ -> false
+    in
+
+    if S.Reduce.conv_term ~global:(not conc_is_local) s ve (Library.Real.mk_zero (S.table s))
     then
       oget_exn
         ~exn:( soft_failure_arg (Failure "Not a hypothesis on inequality between reals"))
@@ -3657,7 +3691,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
       oget_exn ~exn:(soft_failure_arg (Failure "Not a concrete goal")) (CB.get_bound s)
     in
     match
-      Match.T.try_match
+      Match.T.try_match ~global:true
         ~param ~concrete ~ienv ~hyps table ~env system 
         match_bound {opat with pat_op_term = current_bound}
     with
@@ -3722,7 +3756,7 @@ module MkCommonLowTac (S : Sequent.S) = struct
     in
 
     let result =
-      Match.T.try_match
+      Match.T.try_match ~global:true
         ~param ~concrete ~ienv ~hyps table ~env
         system match_bound
         { opat with pat_op_term = current_bound; }
@@ -4368,7 +4402,8 @@ module MkCommonLowTac (S : Sequent.S) = struct
         in
         None, f
     in
-    let pc = S.proof_context s in
+    let is_local = Equiv.is_local f in
+    let pc = S.proof_context ~global:(not is_local) s in
     if discriminate hid f pc then []
     else soft_failure (Failure "discriminate failed")
 
