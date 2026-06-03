@@ -153,7 +153,7 @@ let run_all_async ~timeout ~steps ~provers ~cmd_flag task =
     let results = Why3.Call_provers.get_new_results ~blocking:true in
     if smt_debug then
       Format.printf
-        "%d result(s) obtained after %.2fs.@."
+        "%d more result(s) obtained after %.2fs.@."
         (List.length results)
         (timer ());
     n := !n - List.length results
@@ -1875,6 +1875,27 @@ let sequent_is_valid ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
           ~steps ~provers ~cmd_flag ~poly ~hint_tables s
       ) list_sequent
 
+(* Wrap [sequent_is_valid] in a fork to avoid memory leaks. *)
+let sequent_is_valid ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
+  ~hint_tables s
+=
+  match Unix.fork () with
+  | 0 ->
+    begin match
+      sequent_is_valid ~macro_axioms ~timeout
+        ~steps ~provers ~cmd_flag ~poly ~hint_tables s
+    with
+    | true -> exit 0
+    | _ | exception _ -> exit 1
+    end
+  | pid ->
+    begin match Unix.waitpid [Unix.WUNTRACED] pid with
+    | pid', WEXITED 0 when pid' = pid ->
+      true
+    | _ ->
+      false
+    end
+
 type parameters = {
   timeout : int;
   steps : int option;
@@ -1992,8 +2013,9 @@ let () =
             | ["CVC5",_] -> "--enum-inst"
             | _ -> ""
           in
-          if sequent_is_valid ~macro_axioms ~timeout
-               ~steps ~provers ~cmd_flag ~poly ~hint_tables s
+          if
+            sequent_is_valid ~macro_axioms ~timeout
+              ~steps ~provers ~cmd_flag ~poly ~hint_tables s
           then
             sk [] fk
           else
