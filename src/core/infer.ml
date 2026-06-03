@@ -396,6 +396,15 @@ let compare_ty (t : Type.ty) (t' : Type.ty) : int =
   | _, _ -> Stdlib.compare t t'
 
 (*------------------------------------------------------------------*)
+let univar_is_set (u : Type.univar) (env : env) =
+  match Mid.find u !env.ty with
+  | Type.TUnivar u' -> not (Ident.equal u u')
+  | _ -> true
+  | exception Not_found -> false
+  (* FIXME: this should not happen, as a unset univar should be
+     recorded as a binding (u -> u), not as no binding at all. *)
+  
+(*------------------------------------------------------------------*)
 let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
   let rec do_unif t t' : bool =
     let t, t' = if compare_ty t t' < 0 then t', t else t, t' in
@@ -403,7 +412,13 @@ let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
     if Type.equal t t'
     then true
     else match t, t' with
-      | TUnivar u, _ -> env := { !env with ty = Mid.add u t' !env.ty; }; true
+      | TUnivar u, _ ->
+        if univar_is_set u env then
+          do_unif (Mid.find u !env.ty) t'
+        else begin
+          env := { !env with ty = Mid.add u t' !env.ty; };
+          true
+        end
       | Tuple tl, Tuple tl' ->
         List.length tl = List.length tl' &&
         do_unifs tl tl'

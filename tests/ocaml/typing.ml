@@ -127,7 +127,6 @@ This function test that the reification of t (in the prover state st) is pretty-
 
 
 (*------------------------------------------------------------------*)
-(*------------------------------------------------------------------*)
 let namespaces () =
   let st = Prover.init () in
   let st = Prover.exec_all ~test:true st 
@@ -544,6 +543,7 @@ Proof.
        raise Ok
     );
 
+  (*------------------------------------------------------------------*)
   (* negative test, should fail *)
     Alcotest.check_raises "unknown symbol" Ok
     (fun () ->
@@ -572,8 +572,33 @@ let rec toto t = f (toto t) t."
        raise Ko
     );
 
-    (*------------------------------------------------------------------*)
-    ()
+  (*------------------------------------------------------------------*)
+  (* negative test, should fail *)
+  Alcotest.check_raises "type error 2" Ok
+    (fun () ->
+       let _ : Prover.state =
+         try Prover.exec_all ~test:true st "\
+system null.
+
+(* ----------------------------------------------------------- *)
+let Oh : message -> message = fun (x:message) => zero.
+let Oga : message -> int = fun (x:message) => 0.
+
+global lemma _ :
+  Exists (f : (message -> message) ->
+              (message -> message)),
+    [f Oh = Oh].
+Proof.
+  exists (fun t => (fun (m:message) => t)). (* should fail as it is ill-typed. *)
+"
+         with
+         | Squirrelcore.Typing.Error (_, _) -> raise Ok
+       in
+       raise Ko
+    );
+  
+  (*------------------------------------------------------------------*)
+  ()
 
 (*------------------------------------------------------------------*)
 let cycle_detection () =
