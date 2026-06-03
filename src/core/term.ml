@@ -496,11 +496,21 @@ let mk_name_with_tuple_args n l =
 let mk_macro ms args t = Macro (ms, args, t)
 
 (*------------------------------------------------------------------*)
-let mk_diff l =
+let mk_diff (l : (Projection.t * term) list) : term =
 
+  (* sort [l] such that projections are in lexicographic order *)
+  let l =
+    List.sort
+      (fun (p,_) (p',_) ->
+         String.compare
+           (Projection.to_string p)
+           (Projection.to_string p'))
+      l
+  in
   assert 
     (let projs = List.map fst l in
-     List.sort Stdlib.compare projs = List.sort_uniq Stdlib.compare projs);
+     List.length projs =
+     List.length (List.sort_uniq Stdlib.compare projs));
   
     match l with
   | []     -> assert false
@@ -2258,7 +2268,7 @@ let make_normal_biterm_pair
 
   let diff a b =
     if equal a b then a else
-      Diff (Explicit [lproj,a; rproj,b])
+      mk_diff [lproj,a; rproj,b]
   in
   
   let check_reduced () = reduced := (match t with Diff _ -> true | _ -> false) in
