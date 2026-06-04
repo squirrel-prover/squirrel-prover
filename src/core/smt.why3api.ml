@@ -1791,27 +1791,13 @@ let is_valid
   end;
   if smt_debug then
     Format.printf "%a@." Why3.Pretty.print_task task;
-
-  let run_task () =
-    run_all_async ~timeout ~steps ~provers ~cmd_flag task
-  in
-  
-  if Sys.ocaml_release.major = 5 then begin
-    let control = Gc.get () in
-    let restore () = Gc.set control in
-    Gc.set { control with space_overhead = min 20 control.space_overhead; };
-    try
-      let x = run_task () in
-      restore ();
-      x
-    with
-    | e -> restore (); raise e
-  end
-  else run_task ()
+  run_all_async ~timeout ~steps ~provers ~cmd_flag task
 
 
-(* Tactic registration. *)
+(* Creation and registration of final tactic *)
 
+(** Validity checking for a sequent, taking into account both kinds of
+    hypotheses and [TraceSequent.bound]. *)
 let sequent_is_valid ~macro_axioms
     ~timeout ~steps ~provers ~cmd_flag ~poly ~hint_tables
     (s:TraceSequent.t) : bool
@@ -1835,10 +1821,14 @@ let sequent_is_valid ~macro_axioms
       (function
         | _, Hyps.LHyp (Equiv.Local h) -> Some h
 
-        | _, Hyps.LHyp (Equiv.(Global Atom (Reach {formula = f; bound = None}))) ->
+        | _,
+          Hyps.LHyp
+            (Equiv.(Global Atom (Reach {formula = f; bound = None}))) ->
           if exact then None else Some f
 
-        | _, Hyps.LHyp (Equiv.(Global Atom (Reach {formula = f; bound = Some b}))) ->
+        | _,
+          Hyps.LHyp
+            (Equiv.(Global Atom (Reach {formula = f; bound = Some b}))) ->
           if Real.is_zero table b then Some f else None
                
         | id, Hyps.LDef (def_sys, def) ->
@@ -1861,19 +1851,23 @@ let sequent_is_valid ~macro_axioms
     ~timeout ~steps ~provers ~cmd_flag
     env table system evars hypotheses hints conclusion
 
+(* Wrap [sequent_is_valid] to handle diff operators
+   by calling previous [sequent_is_valid] on each projection of the goal. *)
 let sequent_is_valid ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
   ~hint_tables goal
 =
-  let list_sequent = match SE.to_list (SE.to_fset (TraceSequent.system goal).set) with
+  let list_sequent =
+    match SE.to_list (SE.to_fset (TraceSequent.system goal).set) with
     | exception SystemExpr.(Error (_,Expected_fset)) | [_] -> [goal]
     | l ->
       List.map (fun (lbl,_) -> TraceSequent.pi lbl goal) l
-    in List.for_all
+    in
+    List.for_all
       (fun s ->
         sequent_is_valid
           ~macro_axioms ~timeout
-          ~steps ~provers ~cmd_flag ~poly ~hint_tables s
-      ) list_sequent
+          ~steps ~provers ~cmd_flag ~poly ~hint_tables s)
+      list_sequent
 
 (* Wrap [sequent_is_valid] in a fork to avoid memory leaks. *)
 let sequent_is_valid ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
@@ -1907,19 +1901,20 @@ type parameters = {
 
 
 let all_provers =
-  if disable_smt then []
-  else
-    let no_counterex alt = not (String.ends_with ~suffix:"counterexamples" alt)
-    in let l =
-      List.filter
-        (fun (name,alt) -> name <> "CVC4" && no_counterex alt)
-        (List.map
-            (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern))
-          (Why3.Whyconf.Mprover.keys why3_provers))
-    in
-    match l with
-    | [] -> Tactics.(hard_failure (Failure "No SMT solvers detected"))
-    | _ -> l
+  if disable_smt then [] else
+  let no_counterex alt =
+    not (String.ends_with ~suffix:"counterexamples" alt)
+  in
+  let l =
+    List.filter
+      (fun (name,alt) -> name <> "CVC4" && no_counterex alt)
+      (List.map
+          (fun p -> Why3.Whyconf.(p.prover_name,p.prover_altern))
+        (Why3.Whyconf.Mprover.keys why3_provers))
+  in
+  match l with
+  | [] -> Tactics.(hard_failure (Failure "No SMT solvers detected"))
+  | _ -> l
 
 let default_parameters table = {
   timeout = 1;
@@ -1937,7 +1932,8 @@ let default_parameters table = {
 let parse_prover_arg prover_alt =
   let add_dash s = if s = "AltErgo" then "Alt-Ergo" else s in
   let add_plus alt =
-    if alt = "stringscounterexamples" then "strings+counterexamples" else alt in
+    if alt = "stringscounterexamples" then "strings+counterexamples" else alt
+  in
   match String.split_on_char '_' prover_alt with
   | [p;alt] -> add_dash p, add_plus alt
   | [p] -> add_dash p, ""
@@ -1945,47 +1941,47 @@ let parse_prover_arg prover_alt =
 
 let parse_arg parameters = let open TacticsArgs in function
 
-    (* Provers. *)
-    | NList ({Location.pl_desc="prover"},[String_name {Location.pl_desc="All"}])
-    | NList ({Location.pl_desc="provers"},[String_name {Location.pl_desc="All"}])
-      -> {parameters with provers = all_provers}
-    | NList ({Location.pl_desc="prover"},l)
-    | NList ({Location.pl_desc="provers"},l) ->
-      let process_prover provers {Location.pl_desc=prover_alt} =
-        parse_prover_arg prover_alt :: provers
-      in
-      let l =
-        List.map
-          (function
-            | String_name s -> s
-            | _ -> Tactics.(hard_failure (Failure "expected a symbol")))
-          l
-      in
-      { parameters with provers = List.fold_left process_prover [] l }
+  (* Provers. *)
+  | NList ({Location.pl_desc="prover"},[String_name {Location.pl_desc="All"}])
+  | NList ({Location.pl_desc="provers"},[String_name {Location.pl_desc="All"}])
+    -> {parameters with provers = all_provers}
+  | NList ({Location.pl_desc="prover"},l)
+  | NList ({Location.pl_desc="provers"},l) ->
+    let process_prover provers {Location.pl_desc=prover_alt} =
+      parse_prover_arg prover_alt :: provers
+    in
+    let l =
+      List.map
+        (function
+          | String_name s -> s
+          | _ -> Tactics.(hard_failure (Failure "expected a symbol")))
+        l
+    in
+    { parameters with provers = List.fold_left process_prover [] l }
 
-    (* Other flags. *)
-    | NList ({Location.pl_desc="timeout"},
-        [Int_parsed {Location.pl_desc=s}]) ->
-      { parameters with timeout=s}
-    | NList ({Location.pl_desc="steps"},
-        [Int_parsed {Location.pl_desc=s}]) ->
-      { parameters with steps=Some s}
-    | NArg {Location.pl_desc="no_macros"} ->
-      { parameters with macro_axioms = false }
-    | NArg {Location.pl_desc="no_poly"} ->
-      { parameters with poly = false }
+  (* Other flags. *)
+  | NList ({Location.pl_desc="timeout"},
+      [Int_parsed {Location.pl_desc=s}]) ->
+    { parameters with timeout=s}
+  | NList ({Location.pl_desc="steps"},
+      [Int_parsed {Location.pl_desc=s}]) ->
+    { parameters with steps=Some s}
+  | NArg {Location.pl_desc="no_macros"} ->
+    { parameters with macro_axioms = false }
+  | NArg {Location.pl_desc="no_poly"} ->
+    { parameters with poly = false }
 
-    | NList ({Location.pl_desc="hint"},l) ->
-      let l =
-        List.map
-          (function
-            | String_name s -> s.Location.pl_desc
-            | _ -> Tactics.(hard_failure (Failure "expected a symbol")))
-          l
-      in
-      { parameters with hint_tables = "default"::l }
+  | NList ({Location.pl_desc="hint"},l) ->
+    let l =
+      List.map
+        (function
+          | String_name s -> s.Location.pl_desc
+          | _ -> Tactics.(hard_failure (Failure "expected a symbol")))
+        l
+    in
+    { parameters with hint_tables = "default"::l }
 
-    | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
+  | _ -> Tactics.(hard_failure (Failure "unrecognized argument"))
 
 let parse_args args table =
   List.fold_left parse_arg (default_parameters table) args
@@ -1995,31 +1991,31 @@ let () =
   if not disable_smt then
     ProverTactics.register_general "smt"
       (fun args (s : Goal.t) sk fk ->
-          let args = match args with
-            | [Named_args_gen args] -> args
-            | _ -> assert false
-          in
-          let s = match s with
-            | Goal.Global _ ->
-              Tactics.(hard_failure (Failure "SMT not available"))
-            | Goal.Local s -> s
-          in
-          let table = (TraceSequent.env s).table in
-          let {timeout;steps;
-               provers;macro_axioms;poly;hint_tables} =
-            parse_args args table
-          in
-          let cmd_flag = match provers with
-            | ["CVC5",_] -> "--enum-inst"
-            | _ -> ""
-          in
-          if
-            sequent_is_valid ~macro_axioms ~timeout
-              ~steps ~provers ~cmd_flag ~poly ~hint_tables s
-          then
-            sk [] fk
-          else
-            fk (None, Tactics.Failure "SMT cannot prove sequent"))
+         let args = match args with
+           | [Named_args_gen args] -> args
+           | _ -> assert false
+         in
+         let s = match s with
+           | Goal.Global _ ->
+             Tactics.(hard_failure (Failure "SMT not available"))
+           | Goal.Local s -> s
+         in
+         let table = (TraceSequent.env s).table in
+         let {timeout;steps;
+              provers;macro_axioms;poly;hint_tables} =
+           parse_args args table
+         in
+         let cmd_flag = match provers with
+           | ["CVC5",_] -> "--enum-inst"
+           | _ -> ""
+         in
+         if
+           sequent_is_valid ~macro_axioms ~timeout
+             ~steps ~provers ~cmd_flag ~poly ~hint_tables s
+         then
+           sk [] fk
+         else
+           fk (None, Tactics.Failure "SMT cannot prove sequent"))
 
 (*------------------------------------------------------------------*)
 let () =
@@ -2057,73 +2053,73 @@ let () =
   if List.mem "constr" benchmarks then
     List.iter
       (fun (prover,alt) ->
-            TraceSequent.register_query_alternative
-              (bench_name prover alt "")
-              (fun ~system:_ ~precise:_ ~concrete s q ->
+         TraceSequent.register_query_alternative
+           (bench_name prover alt "")
+           (fun ~system:_ ~precise:_ ~concrete s q ->
+              let s =
+                match q with
+                | None -> s
+                | Some q ->
+                  let conclusion = Term.mk_ands q in
                   let s =
-                    match q with
-                    | None -> s
-                    | Some q ->
-                      let conclusion = Term.mk_ands q in
-                      let s =
-                        if concrete then
-                          TraceSequent.set_bound (ReachConc Term.mk_zero) s
-                        else s
-                      in
-                      TraceSequent.set_conclusion conclusion s
+                    if concrete then
+                      TraceSequent.set_bound (ReachConc Term.mk_zero) s
+                    else s
                   in
-                  sequent_is_valid
-                    ~macro_axioms:true
-                    ~timeout:10
-                    ~steps:None
-                    ~provers:[prover,alt]
-                    ~cmd_flag:""
-                    ~poly:poly
-                    ~hint_tables:[]
-                    s))
+                  TraceSequent.set_conclusion conclusion s
+              in
+              sequent_is_valid
+                ~macro_axioms:true
+                ~timeout:10
+                ~steps:None
+                ~provers:[prover,alt]
+                ~cmd_flag:""
+                ~poly:poly
+                ~hint_tables:[]
+                s))
       provers;
   if List.mem "autosimpl" benchmarks then
     List.iter
       (fun (prover,alt) ->
-        List.iter (fun (cmd_flag) ->
-            TraceTactics.AutoSimplBenchmark.register_alternative
-              (bench_name prover alt cmd_flag)
-              (fun s ->
-                  sequent_is_valid
-                    ~macro_axioms:true
-                    ~timeout:1
-                    ~steps:None
-                    ~provers:[prover,alt]
-                    ~cmd_flag:cmd_flag
-                    ~poly:poly
-                    ~hint_tables:[]
-                    s,
-                  None);
-            TraceTactics.AutoSimplBenchmark.register_alternative
-              ("AutoSimpl")
-              (fun s ->
-                  match TraceTactics.simpl_direct
-                      ~red_param:Reduction.rp_default
-                      ~strong:true ~close:true s
-                  with
-                  | Ok [] -> true,None
-                  | Error _ -> false,None
-                  | Ok _ -> assert false)
-      ) flags )
+         List.iter (fun (cmd_flag) ->
+           TraceTactics.AutoSimplBenchmark.register_alternative
+             (bench_name prover alt cmd_flag)
+             (fun s ->
+                sequent_is_valid
+                  ~macro_axioms:true
+                  ~timeout:1
+                  ~steps:None
+                  ~provers:[prover,alt]
+                  ~cmd_flag:cmd_flag
+                  ~poly:poly
+                  ~hint_tables:[]
+                  s,
+                None);
+           TraceTactics.AutoSimplBenchmark.register_alternative
+             ("AutoSimpl")
+             (fun s ->
+                match TraceTactics.simpl_direct
+                    ~red_param:Reduction.rp_default
+                    ~strong:true ~close:true s
+                with
+                | Ok [] -> true,None
+                | Error _ -> false,None
+                | Ok _ -> assert false))
+         flags)
       provers;
   if List.mem "auto" benchmarks then
     List.iter
       (fun (prover,alt) ->
-            TraceTactics.AutoBenchmark.register_alternative
-              (bench_name prover alt "")
-              (fun (_,s) ->
-                    sequent_is_valid
-                      ~macro_axioms:true
-                      ~timeout:10
-                      ~steps:None
-                      ~provers:[prover,alt]
-                      ~cmd_flag:""
-                      ~poly:poly
-                      ~hint_tables:[]
-                      s))
+         TraceTactics.AutoBenchmark.register_alternative
+           (bench_name prover alt "")
+           (fun (_,s) ->
+              sequent_is_valid
+                ~macro_axioms:true
+                ~timeout:10
+                ~steps:None
+                ~provers:[prover,alt]
+                ~cmd_flag:""
+                ~poly:poly
+                ~hint_tables:[]
+                s))
       provers
