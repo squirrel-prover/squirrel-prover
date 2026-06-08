@@ -61,17 +61,10 @@ type inductive_data = {
 
 type data =
   | Abstract of infos
+  | Alias of Type.ty * Ident.t list
   | Inductive of inductive_data
 
 type Symbols.data += Type of data
-
-(*------------------------------------------------------------------*)
-let of_path ?(args:Type.ty list = []) (s : Symbols.ty) : Type.ty =
-  let top, sub =
-    List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s
-  in
-  Type.of_s_path (top, sub) ~args
-
   
 (*------------------------------------------------------------------*)
 let get_data (s : Symbols.ty) table : data =
@@ -80,18 +73,34 @@ let get_data (s : Symbols.ty) table : data =
 let arity (table : Symbols.table) (symb : Symbols.ty) : int =
   match get_data symb table with
   | Abstract _ -> 0
+  | Alias (_, vars) -> List.length vars
   | Inductive data -> List.length data.ty_vars
+
+(*------------------------------------------------------------------*)
+let of_path table ?(args:Type.ty list = []) (s : Symbols.ty) : Type.ty =
+  let top, sub =
+    List.map Symbols.to_string s.np.Symbols.npath, Symbols.to_string s.s
+  in
+  match get_data s table with
+  | Abstract _  | Inductive _ ->   Type.of_s_path (top, sub) ~args
+  | Alias (t, vars) ->
+    let subst =
+      List.fold_left2 (fun s tu ty -> Subst.add_tvar s tu ty)
+        Subst.empty_subst vars args
+    in
+    Type.alias ~args (top, sub) (Subst.subst_ty subst t)
 
 
 (*------------------------------------------------------------------*)
 (** {2 Inductive types utilities} *)
 
-let is_inductive table (ty : Type.ty) : bool =
+let rec is_inductive table (ty : Type.ty) : bool =
   match ty with
   | Type.TConstr (p,_args) ->
     begin
       match get_data (Symbols.Ty.of_s_path p) table with
       | Abstract _ -> false
+      | Alias (t,_) -> is_inductive table t
       | Inductive _d -> true
     end
   | _ -> false
@@ -101,7 +110,7 @@ let constructors table (ty : Type.ty) : (Symbols.fname list * Type.ty list) opti
   | Type.TConstr (p,args) ->
     begin
       match get_data (Symbols.Ty.of_s_path p) table with
-      | Abstract _ -> None
+      | Abstract _ | Alias _ -> None
       | Inductive d -> Some (d.constructors, args)
     end
   | _ -> None
@@ -128,6 +137,7 @@ let check_ty_info
     | TVar _ | TUnivar _ -> false
     | Tuple l -> List.for_all check l
     | Fun (t1, t2) -> allow_funs && check t1 && check t2
+    | TAlias (_, t, l) -> List.for_all check (t::l)
 
     | Type.Index | Type.Timestamp | Type.Boolean ->
       begin
@@ -149,6 +159,7 @@ let check_ty_info
       begin
         match data with
         | Abstract infos -> assert (args=[]); List.mem info infos
+        | Alias _ -> assert false
         | Inductive data ->
           match info with
           | Well_founded -> true
@@ -211,6 +222,8 @@ let serializability_order
          an array indexed by [t1] of values in [t2] *)
       if is_finite table t1 && o1 = 0 then o2 else max (o1 + 1) o2
 
+    | TAlias (_, t, _) -> order t
+
     | TConstr (_s,args) as ty ->
       let order0_arguments = List.for_all ((=) 0 -| order) args in
 
@@ -246,6 +259,7 @@ let is_enum table ty : bool =
     | Message -> false
     | Tuple l -> List.for_all check l
     | Fun (t1, t2) -> check t1 && check t2
+    | TAlias (_, t, _) -> check t
     | TConstr _ as ty -> check_ty_info table ty Enum
     | _ -> false
   in
@@ -271,6 +285,8 @@ let rec is_quantum : Type.ty -> bool = function
   | TConstr(_, args) as t ->
     Type.equal t Type.tquantum_message ||
     List.exists is_quantum args
+
+  | TAlias (_, t, _) -> is_quantum t
 
   | TVar _ -> false  (** Type variable *)
 

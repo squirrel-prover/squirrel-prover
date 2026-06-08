@@ -355,6 +355,7 @@ let rec convert_type context = function
         Why3.Ty.ty_var t
     else
       raise InternalError
+  | Type.TAlias (_, t, _) -> convert_type context t
   | Type.Fun (t1,t2) ->
     Why3.Ty.ty_func (convert_type context t1) (convert_type context t2)
   | Type.TUnivar _ -> raise InternalError

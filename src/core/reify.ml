@@ -153,6 +153,11 @@ let quote_type (t : Symbols.table) (ienv : Infer.env) (ty : Type.ty) : Term.t =
       doit ty'
     (* invariant: we never need to reify univars *)
 
+    | TAlias (_, t, args) ->
+      if args <> [] then failure (Failure "cannot quote parametrized types");
+      (* FIXME: inductive: support parametrized types in reification *)      
+      doit t
+                       
     | Tuple tl    -> R.Ty.mk_tuple t (AList.quote_list Ty t doit tl)
     | Fun (t1,t2) -> R.Ty.mk_func t (doit t1) (doit t2)
   in

@@ -295,6 +295,8 @@ let rec destr_ty_funs ?ienv (t : Type.ty) (i : int) : Type.ty list * Type.ty =
 
     ty_args, ty_out
 
+  | TAlias (_, t, _), _ -> destr_ty_funs t i
+
   | _ -> assert false
 
 (*------------------------------------------------------------------*)

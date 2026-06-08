@@ -77,7 +77,17 @@ type ty =
   (* FIXME: use a type-safe [Symbols.path] *)
   | TConstr of s_path * ty list
   (** user-defined type constructor (path, args) *)
-        
+
+  | TAlias of s_path * ty * ty list
+  (**
+     user-defined type alias. To enable equality testing without a
+     table, TAlias always contains as a second argument its actual
+     expansion. The third argument is the eventual arguments for type
+     variables, for display only as the expansion is already
+     instantiated.
+  *)
+                
+
   | TVar of tvar
   (** Type variable *)
 
@@ -97,7 +107,7 @@ let fold (f : ty -> 'a -> 'a) (ty : ty) (acc : 'a) : 'a =
     acc
 
   | TConstr (_,l) | Tuple l -> List.fold_left ((^~) f) acc l
-                 
+  | TAlias (_s, ty, l) -> List.fold_left ((^~) f) acc (ty::l)
   | Fun (ty1, ty2) -> f ty1 (f ty2 acc) 
 
 let map (f : ty -> ty) (ty : ty) : ty =
@@ -108,7 +118,7 @@ let map (f : ty -> ty) (ty : ty) : ty =
     
   | TConstr (p,l) -> TConstr (p, List.map f l)
   | Tuple l -> Tuple (List.map f l)
-                 
+  | TAlias (s,ty, l) -> TAlias(s, f ty, List.map f l)
   | Fun (ty1, ty2) -> Fun (f ty1, f ty2)
 
 let map_fold (f : ty -> 'a -> ty * 'a) (ty : ty) (acc : 'a) : ty * 'a =
@@ -132,7 +142,16 @@ let map_fold (f : ty -> 'a -> ty * 'a) (ty : ty) (acc : 'a) : ty * 'a =
         acc l
     in
     Tuple l, acc
-                 
+    
+  | TAlias (s, ty, l) ->
+    let ty, acc = f ty acc in
+    let acc, l =
+      List.fold_left_map
+        (fun acc ty -> let acc, ty = f ty acc in ty, acc)
+        acc l
+    in
+    TAlias (s, ty, l), acc
+
   | Fun (ty1, ty2) ->
     let ty1, acc = f ty1 acc in
     let ty2, acc = f ty2 acc in
@@ -154,6 +173,8 @@ let ttimestamp = Timestamp
 let tindex     = Index
 
 let of_s_path ?(args:ty list = []) (np,s) = TConstr ((np,s),args)
+
+let alias ?(args:ty list = []) (np,s) t = TAlias ((np,s),t , args)
 
 let tunit = Tuple []
 
@@ -196,6 +217,9 @@ let rec equal (a : ty) (b : ty) : bool =
      List.for_all2 equal tys1 tys2
 
    | Fun (t1, t2), Fun (t1', t2') -> equal t1 t1' && equal t2 t2'
+
+   | TAlias (_, t1, _), t2
+   | t1, TAlias (_, t2, _) -> equal t1 t2
      
    | _ -> false
 
@@ -211,20 +235,20 @@ let _pp ~dbg : ty formatter =
   let rec _pp 
       ((outer,side) : ('b * fixity) * assoc)
       (ppf : Format.formatter) (t : ty) : unit 
-    = 
+    =
     match t with
     | Message   -> Fmt.pf ppf "message"
     | Index     -> Fmt.pf ppf "index"
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
 
-    | TConstr ((np,s),args) -> 
+    | TConstr ((np,s),args) | TAlias((np,s),_,args) ->
       let pp_path ppf =
         if np = [] then
           Fmt.pf ppf "%s" s
         else 
           Fmt.pf ppf "%a.%s" (Fmt.list ~sep:(Fmt.any ".") Fmt.string) np s
-      in
+      in    
       let pp ppf () =
         Fmt.pf ppf "@[%t@ %a@]" 
           pp_path
@@ -243,6 +267,7 @@ let _pp ~dbg : ty formatter =
         Fmt.list ~sep:(Fmt.any " * ") (_pp (tuple_fixity,`Left)) ppf tys
       in
       maybe_paren ~outer ~side ~inner:tuple_fixity pp ppf ()
+
 
     | Fun (t1,t2) -> 
       let pp ppf () =
@@ -265,7 +290,7 @@ let to_string (ty : ty) : string =
     | Index     -> Fmt.pf ppf "index"
     | Timestamp -> Fmt.pf ppf "timestamp"
     | Boolean   -> Fmt.pf ppf "bool"
-    | TConstr ((np,s),args) -> 
+    | TConstr ((np,s),args) | TAlias((np,s),_,args) -> 
       let pp_args ppf =
       if args = [] then () else
         Fmt.pf ppf "::%a" (Fmt.list ~sep:(Fmt.any "::") doit) args
@@ -296,6 +321,7 @@ let short_name (ty : ty) : string =
   | Timestamp         -> "t"
   | Boolean           -> "b"
   | TConstr ((_,s),_) -> s
+  | TAlias ((_,s),_,_)  -> s
   | TVar id           -> Ident.name id
   | TUnivar u         -> Ident.name u
   | Tuple _           -> "t"
@@ -319,6 +345,7 @@ let fv (t : ty) : Fv.t =
     | TVar    ti -> Fv.add_tv ti acc
 
     | TConstr (_,tys) | Tuple tys -> List.fold_left fuvs acc tys
+    | TAlias (_,t,_) -> fuvs acc t
     | Fun (t1, t2) -> fuvs (fuvs acc t1) t2
   in
   fuvs Fv.empty t
@@ -335,6 +362,7 @@ let rec decompose_funs t =
   | Fun (t1, t2) -> 
     let lty, tout = decompose_funs t2 in
     t1 :: lty, tout
+  | TAlias (_, t, _) -> decompose_funs t
   | _ -> [], t
 
 (*------------------------------------------------------------------*)

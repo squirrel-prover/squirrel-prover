@@ -307,7 +307,7 @@ let rec convert_ty ?ienv (env : Env.t) (pty : ty) : Type.ty =
         (Failure (Fmt.str "expected %d type arguments" arity));
 
     let args = List.map (convert_ty env) args in
-    HighType.of_path s ~args
+    HighType.of_path env.table s ~args
   in
 
   match L.unloc pty with

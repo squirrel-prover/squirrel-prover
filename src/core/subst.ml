@@ -60,6 +60,7 @@ let subst_ty (s : t) (t : Type.ty) : Type.ty =
     | TConstr (p, tys) -> Type.of_s_path p ~args:(List.map doit tys)
 
     | Tuple tys -> Type.tuple (List.map doit tys)
+    | TAlias (p, ty, tys) -> Type.alias p (doit ty) ~args:(List.map doit tys)
     | Fun (t1, t2) -> Type.func (doit t1) (doit t2)
   in
   doit t

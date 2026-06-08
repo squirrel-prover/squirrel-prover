@@ -35,17 +35,19 @@ type inductive_data = {
 
 type data =
   | Abstract of infos
+  | Alias of Type.ty * Ident.t list
   | Inductive of inductive_data
 
 type Symbols.data += Type of data
 
 (*------------------------------------------------------------------*)
-val of_path : ?args:(Type.ty list) -> Symbols.ty -> Type.ty
-
-(*------------------------------------------------------------------*)
 val get_data : Symbols.ty -> Symbols.table -> data
 
 val arity : Symbols.table -> Symbols.ty -> int
+
+(*------------------------------------------------------------------*)
+val of_path : Symbols.table -> ?args:(Type.ty list) -> Symbols.ty -> Type.ty
+
 
 (*------------------------------------------------------------------*)
 (** {2 Check that a type has some properties. } *)

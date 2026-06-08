@@ -131,6 +131,8 @@ let norm_ty ?(fail_on_cycles = true) (env : env) (t : Type.ty) : Type.ty =
 
     | TConstr (p,args) -> Type.of_s_path p ~args:(List.map (doit seen) args)
 
+    | TAlias (p, t, args) -> Type.alias p (doit seen t) ~args:(List.map (doit seen) args)
+
     | Message | Boolean | Index | Timestamp | TVar _ as t -> t
   in
   doit Sid.empty t
@@ -429,6 +431,10 @@ let unify_ty (env : env) (t : Type.ty) (t' : Type.ty) : [`Fail | `Ok] =
       | TConstr (p, tl), TConstr (p', tl') ->
         p = p' &&
         do_unifs tl tl'
+
+      | TAlias (_, t1, _), t2
+      | t1, TAlias (_, t2, _) ->
+        do_unifs [t1] [t2]                        
 
       | _ -> false
 

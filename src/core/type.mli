@@ -40,7 +40,17 @@ type ty = private
   (* FIXME: use a type-safe [Symbols.path] *)
   | TConstr of s_path * ty list
   (** user-defined type constructor (path, args) *)
-        
+
+  | TAlias of s_path * ty * ty list
+  (**
+     user-defined type alias. To enable equality testing without a
+     table, TAlias always contains as a second argument its actual
+     expansion. The third argument is the eventual arguments for type
+     variables, for display only as the expansion is already
+     instantiated.
+  *)
+
+
   | TVar of tvar
   (** type variable *)
 
@@ -124,7 +134,8 @@ val tunit : ty
 (** Prelude types *)
 
 val of_s_path : ?args:ty list -> (string list * string) -> ty
-
+val alias     : ?args:ty list -> s_path -> ty -> ty
+  
 (*------------------------------------------------------------------*)
 val tquantum_message : ty
 val tmeasure_rnd     : ty

@@ -473,7 +473,7 @@ module PatternMatching = struct
         begin 
           let p = Symbols.Ty.of_s_path p in
           match HighType.get_data p table with
-          | Abstract _ -> raise UnfoldFailed
+          | Abstract _ | Alias _ -> raise UnfoldFailed
           | Inductive data ->
             List.map (fun (constructor : Symbols.fname) ->
                 let c = Term.mk_fun table constructor ~ty_args:args [] in
@@ -1782,6 +1782,7 @@ let define_oracle_tag_formula (h : lsymb) table (fm : Typing.term) :
     after generalization, [path] no longer occurs in [ty]). *)
 let generalize_type
     (loc : L.t)
+    table
     (path : Symbols.ty) (args : Type.ty list) 
     (ty_var : Ident.t)
     ~(in_ty : Type.ty) : Type.ty
@@ -1797,7 +1798,7 @@ let generalize_type
             error loc KDecl
               (Failure (Fmt.str "%a can only occur as %a" 
                           Symbols.pp_path path 
-                          Type.pp (HighType.of_path path ~args)));
+                          Type.pp (HighType.of_path table path ~args)));
           ty_var
         end
       else Type.map doit ty
@@ -1827,6 +1828,7 @@ let positive_tvars table (ty : Type.ty) : Sid.t * Sid.t =
       begin 
         match HighType.get_data (Symbols.Ty.of_s_path path) table with
         | Abstract _ -> assert (l = []); (pos,neg)
+        | Alias _ -> assert false
         | Inductive data ->
           List.fold_left2 (fun (pos,neg) ty ty_var ->
               let pos_ty, neg_ty = doit Sid.empty Sid.empty ty in
@@ -1842,6 +1844,8 @@ let positive_tvars table (ty : Type.ty) : Sid.t * Sid.t =
       end
       
     | Type.Tuple l -> doit_list pos neg l
+
+    | Type.TAlias (_, t, _) -> doit pos neg t
 
     | Type.Fun (t1, t2) ->
       let neg, pos = doit neg pos t1 in (* swap pos and neg in [t1] *)
@@ -1864,6 +1868,32 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
       in
       table
 
+    | `Alias p_data ->
+      assert(decl.ty_infos = []);
+      begin
+        match p_data.constructors with
+        | [(_, ty)] ->
+          
+          let ty_vars = 
+            List.map (fun l ->
+                Type.mk_tvar (L.unloc l)
+              ) p_data.ty_vars
+          in
+
+          let env = Env.init ~table ~ty_vars:(List.rev ty_vars) () in
+
+          let ty = Typing.convert_ty env ty in
+          
+          let data = HighType.Alias (ty, ty_vars) in
+
+          let table, _ = 
+            Symbols.Ty.declare
+              ~approx:false table decl.ty_name ~data:(HighType.Type data) 
+          in
+          table
+          
+        | _ -> assert false
+      end
 
     | `Inductive p_data -> 
       assert(decl.ty_infos = []);
@@ -1913,11 +1943,11 @@ let parse_ty_decl table (decl : Decl.ty_decl) : Symbols.table =
               : Sid.t * Sid.t * bool
               (* positive, negative, recursive *)
               =
-              let ty_decl = HighType.of_path name ~args:(List.map Type.tvar ty_vars) in
+              let ty_decl = HighType.of_path env.table name ~args:(List.map Type.tvar ty_vars) in
 
               let tau = Ident.create "τ" in
               let tau_t = Type.tvar tau in
-              let ty = generalize_type loc path args tau ~in_ty:ty in
+              let ty = generalize_type loc table path args tau ~in_ty:ty in
               let ty_args, ty_out = Type.decompose_funs ty in
 
               (* constructor outputs values of type [τ] *)

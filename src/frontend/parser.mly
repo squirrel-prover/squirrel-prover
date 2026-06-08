@@ -789,6 +789,13 @@ declaration_i:
 | TYPE e=lsymb infos=ty_infos
                           { Decl.Decl_ty { ty_name = e; ty_infos = infos; ty_body = `Abstract; }}
 
+| TYPE e=lsymb ty_vars=slist(lsymb,empty) EQ ty=ty
+                          { let ty_body = 
+                              `Alias Decl.{ constructors=[(e,ty)]; ty_vars; }
+                            in
+                            Decl.Decl_ty { ty_name = e; ty_infos = []; ty_body; }}
+
+
 | INDUCTIVE e=lsymb ty_vars=slist(lsymb,empty) constructors=inductive_constructors
                           { let ty_body = 
                               `Inductive Decl.{ constructors; ty_vars; }
