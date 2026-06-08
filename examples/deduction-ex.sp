@@ -12,23 +12,23 @@ include Deduction.
 
 op get_leq : message -> timestamp -> message.
 
-axiom [any] get_leq_base t : 
+exact axiom [any] get_leq_base t : 
   happens(t) => 
   get_leq (frame@t) t = frame@t.
 
-axiom [any] get_leq_pred t t' : 
+exact axiom [any] get_leq_pred t t' : 
   happens(t) => t' < t =>
   get_leq (frame@t) t' = get_leq (frame@pred t) t'.
 
-axiom [any] get_leq_default t t' : 
+exact axiom [any] get_leq_default t t' : 
   happens(t) => t' > t =>
   get_leq (frame@t) t' = zero.
 
-axiom [any] get_leq_no_happens t t' : 
+exact axiom [any] get_leq_no_happens t t' : 
   not (happens(t)) => 
   get_leq (frame@t) t' = zero.
 
-axiom [any] get_leq_no_happens' t t' : 
+exact axiom [any] get_leq_no_happens' t t' : 
   not (happens(t')) => 
   get_leq (frame@t) t' = zero.
 

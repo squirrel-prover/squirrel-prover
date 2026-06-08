@@ -2538,8 +2538,9 @@ let knowledge_mem_tsets
   =
   let quantum = TConfig.post_quantum_equivs pc.env.table in
   let is_in (input : TSet.t) : Term.terms option =
-    (* TODO: quantum: this assert is temporary, and should eventually
-       be removed *)
+    (* This assert was added when during the second port of Squirrel
+       to post-quantum cryptography. It was useful to catch errors
+       during that port, but may be eventually removed. *)
     assert(not quantum || HighType.is_classical pc.env.table (Term.ty input.term));
     let input = TSet.refresh input in
     match TSet.cterm_mem pc output input with
