@@ -68,7 +68,6 @@ parameter used in security proofs.
 .. note:: A finite type is still unbounded:
           the semantics for the type can be any finite set.
 
-
 .. _section-polymorphism:
 
 Type variables and polymorphism
@@ -105,6 +104,20 @@ The most common function symbols have types of the form :g:`(b1 * ... * bn) -> b
    it takes as input the value to be hashed (of type :g:`message`) and a
    key (of type :g:`key_ty`), and returns a digest of type :g:`hash_ty`.
 
+
+We allow declaring type alias, where the name of the newly declared type becomes syntactic sugar for its definition.
+   
+.. decl:: type @ident {?  {+, @ident }}  =  @explicit_type
+  :name: type_alias
+
+  Declare a new type alias. A type alias may be polymorphic, and thus paramterized by some type variables.
+	 
+
+.. example:: Hash function
+       
+   We may declare a type for all hash functions with :g:`type hashfuns = (message * key_ty) -> hash_ty`. If we want to consider the type of all hash functions with arbitrary input domain, we can do :g:`type hashfuns inp = (inp * key_ty) -> hash_ty`.
+
+   
 Binders and tags
 ----------------
 

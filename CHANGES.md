@@ -1,3 +1,16 @@
+### Type aliases
+[commits: `379fabc5`]
+
+Enable the declaration of type aliases. We can define a type which is
+an alias for another one, with
+
+```
+type myalias var1 ... varn = myothertype.
+```
+
+A type alias is perfectly equal to its definition and behaves the same
+everywhere but in display.
+
 ### Deprecate old tactics
 [commits: `933cac81`, **breaking change**]
 
