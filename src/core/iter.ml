@@ -1101,7 +1101,7 @@ let fold_macro_support
   let () =
     let decreasing_infos = 
       List.map
-        (fun (m,_) -> Macros.decreasing_info0 table ~env m) 
+        (fun (m,_) -> Macros.decreasing_info0 table ~env m, (Macros.get_macro_info table m).is_ptime)
         (Mp.bindings macro_ind_occs) 
     in
 
@@ -1115,7 +1115,7 @@ let fold_macro_support
      as a macro [f] in group 1 could be reachable from the body of a
      macro [g] in group 2. *)
     let groups =
-      List.map (fun x -> x.Macros.group) decreasing_infos |>
+      List.map (fun x -> (fst x).Macros.group) decreasing_infos |>
       List.sort_uniq Macros.compare_group
     in
 
@@ -1134,37 +1134,40 @@ let fold_macro_support
     (*------------------------------------------------------------------*)
     if decreasing_infos = []
     then () (* no recursive function, thus no further checks needed *)
-    else begin
-      let decreasing_info = List.hd decreasing_infos in
-
-      let dec_ty = decreasing_info.decreasing_quantity_type in
-
-      let check_ptime =
-        match mode with
-        | PTimeNoSI | PTimeSI -> true
-        | NoHonestRand | Any -> false
-      in
-      
-      (* If the simulation must be ptime, we check that the type is
-         finite+fixed, as this ensures that the simulation is polynomial. *)
-      if check_ptime && not (HighType.is_fixed table dec_ty) then begin
-        let err_message =
-          Fmt.str
-            "@[<hov 2>The type of the decreasing quantity must be fixed:@ @[%a@]@]"
-            Type.pp dec_ty
-        in
-        Tactics.soft_failure (Tactics.Failure err_message)
-      end;
-
-      if check_ptime && not (HighType.is_finite table dec_ty) then begin
-        let err_message =
-          Fmt.str
-            "@[<hov 2>The type of the decreasing quantity must be finite:@ @[%a@]@]"
-            Type.pp dec_ty
-        in
-        Tactics.soft_failure (Tactics.Failure err_message)
-      end;
-    end
+    else
+      let decreasing_info, ptime = List.hd decreasing_infos in
+      if not ptime then
+        (* if the recursive function was not assumed PTIME, we rely on
+           the input type size. *)
+        begin
+          let dec_ty = decreasing_info.decreasing_quantity_type in
+          
+          let check_ptime =
+            match mode with
+            | PTimeNoSI | PTimeSI -> true
+            | NoHonestRand | Any -> false
+          in
+          
+          (* If the simulation must be ptime, we check that the type is
+             finite+fixed, as this ensures that the simulation is polynomial. *)
+          if check_ptime && not (HighType.is_fixed table dec_ty) then begin
+            let err_message =
+              Fmt.str
+                "@[<hov 2>The type of the decreasing quantity must be fixed:@ @[%a@]@]"
+                Type.pp dec_ty
+            in
+            Tactics.soft_failure (Tactics.Failure err_message)
+          end;
+          
+          if check_ptime && not (HighType.is_finite table dec_ty) then begin
+            let err_message =
+              Fmt.str
+                "@[<hov 2>The type of the decreasing quantity must be finite:@ @[%a@]@]"
+                Type.pp dec_ty
+            in
+            Tactics.soft_failure (Tactics.Failure err_message)
+          end;
+        end
   in
 
   (*------------------------------------------------------------------*)
