@@ -30,7 +30,11 @@ ghave [C | C] : [n=0 || n <>0] by auto.
    smt. 
 Qed.
 
-
+global lemma [any] _ : Forall (n:_[const]), $( (zeros (n-1)) |> (zeros n)).
+Proof.
+intro n.
+deduce ~all. 
+Qed.
 
 game empty = {}.
 
@@ -73,3 +77,33 @@ Proof.
  + have F : forall (t:int), t = 1 && not (t = 0) && t <= 3 => false   by admit.
    assumption.
 Qed.
+
+
+
+
+let rec zeros_ts ~admit_ptime t = if t=init || not(happens(t)) then Nil else Cons 0 (zeros_ts (pred t)).
+Proof.
+smt.
+Qed.
+
+
+global lemma [any] _ : Forall (t:_[const]), $( (zeros_ts (pred(pred(t)))) |> (zeros_ts t)).
+Proof.
+intro n.
+checkfail (deduce ~all) exn ApplyMatchFailure. 
+Abort.
+
+set deduceUnrollOpaque=2.
+
+
+global lemma [any] _ : Forall (t:_[const]), $( (zeros_ts (pred(pred(t)))) |> (zeros_ts t)).
+Proof.
+intro n.
+deduce ~all. 
+Qed. 
+
+global lemma [any] _ : Forall (t:_[const]), $( (zeros_ts (pred(pred(pred(t))))) |> (zeros_ts t)).
+Proof.
+intro n.
+checkfail (deduce ~all) exn ApplyMatchFailure. 
+Abort.

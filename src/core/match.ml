@@ -3022,6 +3022,23 @@ let fa_decompose
 
   | _ -> None
 
+module Mmacros = Symbols.Mp(Symbols.Macro)
+
+
+(* For opaque macros, we keep in ts a count of how many times we have visited them when trying to deduce. We then allow to unroll them up to a bound. *)
+let update_count_visited table t ts = match t with
+  | Term.Macro (ms, _, _) when
+      (Macros.get_rw_strat table ms = Macros.Opaque)
+    ->
+    begin
+      match Mmacros.find_opt ms.s_symb ts with
+      | None -> 1, Mmacros.add ms.s_symb 1 ts
+      | Some i -> i+1, Mmacros.add ms.s_symb (i+1) @@ Mmacros.remove ms.s_symb ts
+    end
+  | _ -> 0, ts
+
+
+
 (*------------------------------------------------------------------*)
 (** Check if [inputs ▷ output]. 
     More precisely, if [output = (v | ψ) ] then verify if:
@@ -3039,6 +3056,7 @@ let fa_decompose
 let rec deduce
     ~(output : cond_term)
     ~(inputs : info known_sets)
+    ?(count_visited = Mmacros.empty)
     (st      : deduce_state) 
   : deduce_result
   =
@@ -3052,18 +3070,23 @@ let rec deduce
   | None ->
     (* if that fails, decompose [term] through the Function Application
        rule, and recurse. *)
-    deduce_fa ~output ~inputs st
-      
+    deduce_fa ~count_visited ~output ~inputs st
+
 (** Check if [inputs ▷ output] using the function application rules. 
     See [deduce] for the precise semantics of [inputs ▷ output]. *)
 and deduce_fa
     ~(output : cond_term)
     ~(inputs : info known_sets)
+    ~count_visited
     (st      : deduce_state)
   : deduce_result
   =
   (* deduction parametrizes reduction its own way for now
      (i.e. we do not use [st.red_param] and [st.red_strat]) *)
+
+  let unrolled_number, count_visited =
+    update_count_visited st.unif_state.table output.term count_visited
+  in
   let red_param = ReductionCore.rp_crypto in
   let strat = ReductionCore.(MayRedSub rp_crypto) in
   match fa_decompose output st with
@@ -3071,8 +3094,32 @@ and deduce_fa
     (* We could not decompose [output] through into deduction sub-goals.
        Try to reduce [output] and restart [deduce]. *)
     let term, has_red = whnf ~red_param ~strat st.unif_state output.term in
-    if has_red then
-      deduce ~output:{ output with term; } ~inputs st
+    let term, has_red' =
+      Printer.prt `Default "%i : %a" unrolled_number Term.pp term;
+      if unrolled_number > TConfig.deduce_unroll_opaque st.unif_state.table then
+        term, ReductionCore.False
+      else
+        let vars = Vars.add_vars st.unif_state.bvs st.unif_state.env in
+        let module R : ReductionCore.Sig =
+          (val ReductionCore.Register.get ())
+        in
+        let env =
+          Env.init
+            ~table:st.unif_state.table
+            ~system:st.unif_state.system
+            ~vars ()
+        in
+        let pc = ProofContext.make ~env ~hyps:st.unif_state.hyps ~concrete:st.unif_state.concrete in        
+        reduce_delta1
+          ~unfold_opaque:true
+          ~constr:red_param.constr
+          ~delta:red_param.delta
+          pc term
+    in
+
+
+    if has_red || (has_red'=ReductionCore.True) then
+      deduce ~count_visited ~output:{ output with term; } ~inputs st
     else
       { 
         mv = st.unif_state.mv; 
@@ -3086,7 +3133,7 @@ and deduce_fa
       minfos_check_st output.term subterms st.minfos
     in
 
-    deduce_list ~outputs:fa_conds ~inputs { st with minfos; }
+    deduce_list ~count_visited ~outputs:fa_conds ~inputs { st with minfos; }
 
 (** Check if [inputs ▷ outputs] using the transitivity and quantifier
     rule. An entry [(vars, output)] in [outputs] represents the term
@@ -3096,6 +3143,7 @@ and deduce_fa
 and deduce_list
     ~(outputs : (Vars.vars * cond_term) list)
     ~(inputs  : info known_sets)
+    ~count_visited
     (st       : deduce_state)
   : deduce_result
   =
@@ -3120,13 +3168,13 @@ and deduce_list
         bvs = Vars.Tag.global_vars ~adv:true vars @ st.unif_state.bvs;
         mv = mv;
       } in
-      
+
       let st = { st with unif_state; minfos; } in
 
       if vars = [] then
-        deduce ~output:t ~inputs st
+        deduce ~count_visited ~output:t ~inputs st
       else
-        deduce_classical ~output:t ~inputs st
+        deduce_classical ~count_visited ~output:t ~inputs st
     ) init_deduce_result outputs
 
 (** In classical mode, this is exactly [deduce].
@@ -3135,6 +3183,7 @@ and deduce_list
 and deduce_classical
     ~(output : cond_term)
     ~(inputs : info known_sets)
+    ~count_visited
     (st      : deduce_state) 
   : deduce_result
   =
@@ -3148,12 +3197,12 @@ and deduce_classical
 
     (* deduce [output] *)
     let result =
-      deduce ~output ~inputs:classical_inputs st
+      deduce ~count_visited ~output ~inputs:classical_inputs st
     in
 
     (* restore previous inputs with their [used] flags *)
     { result with inputs; }
-  else deduce ~output ~inputs st
+  else deduce ~count_visited ~output ~inputs st
   
 (*------------------------------------------------------------------*)
 (** {3 Deduction: left reasoning} *)

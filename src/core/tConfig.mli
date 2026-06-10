@@ -76,6 +76,11 @@ val post_quantum_equivs : Symbols.table -> bool
     to prove polymorphic deduction properties. *)
 val deduction_order_guard : Symbols.table -> bool
 
+
+(* Allows to tweak how many times the deduce heuristics will try to
+   unroll an opaque macro to try to conclude. *)
+val deduce_unroll_opaque :  Symbols.table -> int
+
 (** Should Squirrel check that the top-level terms in equivalences are
     such that their approximated and exact semantics coincide. *)
 val quantum_check_toplevel : Symbols.table -> bool
