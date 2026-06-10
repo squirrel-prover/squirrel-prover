@@ -1234,6 +1234,20 @@ let parse_fun_decls
 
           let { admit_ptime; opaque } = parse_op_annot pd.decl.Decl.op_annots in
 
+          (* A single recursive macro not defined by a match will
+             always unroll without conditions, and thus lead to
+             infinite loops in Crypto, or iter or deduce. Hence, we
+             automatically set it to opaque.  We only do so for a
+             single macro decl, as e.g., one can commonly do
+             ```
+             let rec f1 x = f2 x
+             and f2 x with ....
+             ```
+             where we don't want f1 to be opaque. 
+          *)
+          let opaque = opaque ||
+                       (List.length decls = 1 && is_rec && not is_match) in
+
           (* choose the rewrite strategy for the macro *)
           let rw_strat = if opaque then Macros.Opaque else Macros.Exact in
 
