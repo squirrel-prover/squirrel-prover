@@ -1966,7 +1966,7 @@ module Lit = struct
     | Happens _ -> Type.ttimestamp
     | Comp (_, t1, t2) ->
       let ty1 = ty t1 in
-      assert (ty1 = ty t2);
+      assert (Type.equal ty1 (ty t2));
       ty1
     | Atom _ -> Type.tboolean
 
