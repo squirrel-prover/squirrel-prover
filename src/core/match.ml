@@ -3095,7 +3095,6 @@ and deduce_fa
        Try to reduce [output] and restart [deduce]. *)
     let term, has_red = whnf ~red_param ~strat st.unif_state output.term in
     let term, has_red' =
-      Printer.prt `Default "%i : %a" unrolled_number Term.pp term;
       if unrolled_number > TConfig.deduce_unroll_opaque st.unif_state.table then
         term, ReductionCore.False
       else
