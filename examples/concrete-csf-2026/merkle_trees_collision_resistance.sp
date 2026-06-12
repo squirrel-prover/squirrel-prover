@@ -153,10 +153,6 @@ Qed.
 (* ------------------------------------------------------------------- *)
 inductive side = Left : side | Right : side.
 
-let side_match (f_Left,f_Right : Real.t) (x : side) : Real.t with
-  | Left -> f_Left
-  | Right -> f_Right.
-
 
 exact lemma right_left : (Right = Left) = false.
 Proof. 
