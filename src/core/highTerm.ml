@@ -132,7 +132,9 @@ let tags_of_term
          FEAT: analyze the macro body to see whether it preserves
          [const], [si], [det], or [adv] (for the latter, we currently
          only rely on admitted user-annotations. *)
-      { (mk_tags ~no_diff:true ()) with adv = info.is_ptime && merged.adv; }
+      { (mk_tags ~no_diff:true ()) with
+        adv = info.is_ptime && merged.adv;
+        si  = info.is_ptime && merged.si}
     (* TODO: multi-terms: once macros are decorated by system
        expressions, this needs to change *)
 
