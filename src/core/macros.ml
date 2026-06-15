@@ -1245,7 +1245,12 @@ let unfold_structured_macro
       Term.subst subst -|
       Term.gsubst ty_subst
     in
-    { body with
+    let pat =  match body.pattern with
+      | None -> None
+      | Some pat -> Some (Term.gsubst ty_subst pat) in
+    let vars  = List.map (Subst.subst_var ty_subst) body.vars in
+    { pattern = pat;
+      vars;
       when_cond = doit body.when_cond;
       out       = doit body.out;
     }
