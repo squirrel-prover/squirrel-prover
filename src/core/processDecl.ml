@@ -981,7 +981,7 @@ let get_rec_occs
 
 (*------------------------------------------------------------------*)
 type op_annot = {
-  admit_ptime : bool;
+  admit_adv : bool;
   opaque : bool;
 }
 
@@ -992,12 +992,12 @@ let[@warning "-23"]
   let doit annot (arg : _ Args.named_arg) =
     match arg with
     (* disable the opposite case if asked to *)
-    | NArg {L.pl_desc="admit_ptime"} -> { annot with admit_ptime = true; }
+    | NArg {L.pl_desc="admit_adv"} -> { annot with admit_adv = true; }
     | NArg {L.pl_desc="opaque"} -> { annot with opaque = true; }
     | NArg l | NList (l, _) ->
       Tactics.hard_failure ~loc:(L.loc l) (Failure "invalid argument")
   in
-  List.fold_left doit { admit_ptime = false; opaque = false; } annots
+  List.fold_left doit { admit_adv = false; opaque = false; } annots
 
 (*------------------------------------------------------------------*)
 (** Parse an abstract or concrete list of function declarations. *)
@@ -1233,7 +1233,7 @@ let parse_fun_decls
           (* is the declaration defined by pattern-matching *)
           let is_match  = match pd.decl.Decl.op_body with `Match _ -> true | _ -> false in 
 
-          let { admit_ptime; opaque } = parse_op_annot pd.decl.Decl.op_annots in
+          let { admit_adv; opaque } = parse_op_annot pd.decl.Decl.op_annots in
 
           (* A single recursive macro not defined by a match will
              always unroll without conditions, and thus lead to
@@ -1268,7 +1268,7 @@ let parse_fun_decls
                   pp_style = `Standard;
                   (* the `@` notation is currently reserved to builtin (this
                    could be changed) *)
-                  is_ptime = admit_ptime;
+                  is_adv = admit_adv;
                 } 
               in
               table, Some name, Some info
@@ -1887,7 +1887,7 @@ let define_match
   let info = 
     Term.{
       is_rec = false; is_match = true;
-      is_ptime = true;
+      is_adv = true;
       has_dist_param = true;    (* since there is a match *)
       pp_style = `Standard;
     } 

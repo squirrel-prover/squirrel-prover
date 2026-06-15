@@ -4,7 +4,7 @@ include Int.
 open Int.
 
 (* We admit_adv, so that we can do a function over n and use crypto over it. *)
-let rec zeros ~admit_ptime (n:int) = if n=0 then Nil else Cons 0 (zeros (n-1)).
+let rec zeros ~admit_adv (n:int) = if n=0 then Nil else Cons 0 (zeros (n-1)).
 Proof.
 smt.
 Qed.

@@ -1204,7 +1204,7 @@ let fold_macro_support
   let () =
     let decreasing_infos = 
       List.map
-        (fun (m,_) -> Macros.decreasing_info0 table ~env m, (Macros.get_macro_info table m).is_ptime)
+        (fun (m,_) -> Macros.decreasing_info0 table ~env m, (Macros.get_macro_info table m).is_adv)
         (Mp.bindings macro_ind_occs) 
     in
 

@@ -41,7 +41,7 @@ type macro_info = {
   is_match : bool;
   has_dist_param : bool;
 
-  is_ptime : bool;
+  is_adv : bool;
   (** can the macro be evaluated in polynomial-time (without access to
       protocol randomness). *)
 }
@@ -52,7 +52,7 @@ let macro_info_builtin : macro_info = {
   has_dist_param = true; 
   is_rec         = true; 
   is_match       = true; 
-  is_ptime       = false; 
+  is_adv       = false; 
 } 
 
 (*------------------------------------------------------------------*)

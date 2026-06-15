@@ -138,10 +138,10 @@ Proof. split; intro > <-; discriminate. Qed.
 
    We admit that `hash_tree` and `hash_tree0` can be computed in
    polynomial-time. *)
-let rec hash_tree ~admit_ptime k (t : tree) = fhash (hash_tree0 k t) k
+let rec hash_tree ~admit_adv k (t : tree) = fhash (hash_tree0 k t) k
 termination_by (t,1)
 
-and hash_tree0 ~admit_ptime k (t : tree) with
+and hash_tree0 ~admit_adv k (t : tree) with
 | Leaf m -> encode_leaf m
 | Node l r -> encode_node (hash_tree k l, hash_tree k r)
 termination_by (t,0).
@@ -199,7 +199,7 @@ Proof. intro > <-; discriminate. Qed.
 (* If `p` proves that a tree `tsub` with hash `hsub` is a
    sub-tree of `t`, computes `hash_tree t`. 
    We admit that `hash_path` can be computed in polynomial-time. *)
-let rec hash_path ~admit_ptime (hsub : message) (p : proof) : message  with
+let rec hash_path ~admit_adv (hsub : message) (p : proof) : message  with
 | MEmp -> hsub
 | MCons side ha psub -> 
   let hb = hash_path hsub psub in

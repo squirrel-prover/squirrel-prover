@@ -29,7 +29,7 @@ type macro_info = {
       - when [false], the last field [x] of the macro constructor
         [Macros (_,_,x)] is set to the default (unprinted) [unit]. *)
 
-  is_ptime : bool;
+  is_adv : bool;
   (** can the macro be evaluated in polynomial-time (without access to
       protocol randomness). *)
 }
