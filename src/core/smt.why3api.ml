@@ -2053,73 +2053,73 @@ let () =
   if List.mem "constr" benchmarks then
     List.iter
       (fun (prover,alt) ->
-         TraceSequent.register_query_alternative
-           (bench_name prover alt "")
-           (fun ~system:_ ~precise:_ ~concrete s q ->
-              let s =
-                match q with
-                | None -> s
-                | Some q ->
-                  let conclusion = Term.mk_ands q in
+            TraceSequent.register_query_alternative
+              (bench_name prover alt "")
+              (fun ~system:_ ~precise:_ ~concrete s q ->
                   let s =
-                    if concrete then
-                      TraceSequent.set_bound (ReachConc Term.mk_zero) s
-                    else s
+                    match q with
+                    | None -> s
+                    | Some q ->
+                      let conclusion = Term.mk_ands q in
+                      let s =
+                        if concrete then
+                          TraceSequent.set_bound (ReachConc Term.mk_zero) s
+                        else s
+                      in
+                      TraceSequent.set_conclusion conclusion s
                   in
-                  TraceSequent.set_conclusion conclusion s
-              in
-              sequent_is_valid
-                ~macro_axioms:true
-                ~timeout:10
-                ~steps:None
-                ~provers:[prover,alt]
-                ~cmd_flag:""
-                ~poly:poly
-                ~hint_tables:[]
-                s))
+                  sequent_is_valid
+                    ~macro_axioms:true
+                    ~timeout:10
+                    ~steps:None
+                    ~provers:[prover,alt]
+                    ~cmd_flag:""
+                    ~poly:poly
+                    ~hint_tables:["default"]
+                    s))
       provers;
   if List.mem "autosimpl" benchmarks then
     List.iter
       (fun (prover,alt) ->
-         List.iter (fun (cmd_flag) ->
-           TraceTactics.AutoSimplBenchmark.register_alternative
-             (bench_name prover alt cmd_flag)
-             (fun s ->
-                sequent_is_valid
-                  ~macro_axioms:true
-                  ~timeout:1
-                  ~steps:None
-                  ~provers:[prover,alt]
-                  ~cmd_flag:cmd_flag
-                  ~poly:poly
-                  ~hint_tables:[]
-                  s,
-                None);
-           TraceTactics.AutoSimplBenchmark.register_alternative
-             ("AutoSimpl")
-             (fun s ->
-                match TraceTactics.simpl_direct
-                    ~red_param:Reduction.rp_default
-                    ~strong:true ~close:true s
-                with
-                | Ok [] -> true,None
-                | Error _ -> false,None
-                | Ok _ -> assert false))
-         flags)
+        List.iter (fun (cmd_flag) ->
+            TraceTactics.AutoSimplBenchmark.register_alternative
+              (bench_name prover alt cmd_flag)
+              (fun s ->
+                  sequent_is_valid
+                    ~macro_axioms:true
+                    ~timeout:1
+                    ~steps:None
+                    ~provers:[prover,alt]
+                    ~cmd_flag:cmd_flag
+                    ~poly:poly
+                    ~hint_tables:["default"]
+                    s,
+                  None);
+            TraceTactics.AutoSimplBenchmark.register_alternative
+              ("AutoSimpl")
+              (fun s ->
+                  match TraceTactics.simpl_direct
+                      ~red_param:Reduction.rp_default
+                      ~strong:true ~close:true s
+                  with
+                  | Ok [] -> true,None
+                  | Error _ -> false,None
+                  | Ok _ -> assert false)
+      ) flags )
       provers;
   if List.mem "auto" benchmarks then
     List.iter
       (fun (prover,alt) ->
-         TraceTactics.AutoBenchmark.register_alternative
-           (bench_name prover alt "")
-           (fun (_,s) ->
-              sequent_is_valid
-                ~macro_axioms:true
-                ~timeout:10
-                ~steps:None
-                ~provers:[prover,alt]
-                ~cmd_flag:""
-                ~poly:poly
-                ~hint_tables:[]
-                s))
+            TraceTactics.AutoBenchmark.register_alternative
+              (bench_name prover alt "")
+              (fun (_,s) ->
+                    sequent_is_valid
+                      ~macro_axioms:true
+                      ~timeout:10
+                      ~steps:None
+                      ~provers:[prover,alt]
+                      ~cmd_flag:""
+                      ~poly:poly
+                      ~hint_tables:["default"]
+                      s))
       provers
