@@ -2305,19 +2305,6 @@ let declare_list table decls =
 (** {3 Hints } *)
 
 (*------------------------------------------------------------------*)
-let add_hint_rewrite table (s : Symbols.p_path) =
-  let lem = Lemma.find_stmt_local s table in
-  let bound = lem.formula.bound in
-
-  if bound = None || not (Real.is_zero table (oget bound)) then
-    Tactics.hard_failure ~loc:(L.loc (snd s))
-      (Failure "rewrite hints must be exact");
-
-  assert (lem.system.pair = None;); (* as we only forward [system.set] below *)
-
-  Hint.add_hint_rewrite s lem.params lem.system.set lem.Goal.formula.formula table
-
-(*------------------------------------------------------------------*)
 let add_hint_smt table (s : Symbols.p_path) (smt_table : string) =
   let lem = Lemma.find_stmt_local s table in
   let bound = lem.formula.bound in
@@ -2340,6 +2327,21 @@ let add_hint_smt table (s : Symbols.p_path) (smt_table : string) =
       params = lem.params ; system = lem.system }
   in
   Hint.add_hint_smt hint smt_table table
+
+(*------------------------------------------------------------------*)
+
+let add_hint_rewrite table (s : Symbols.p_path) =
+  let table2 = add_hint_smt table s "default" in 
+  let lem = Lemma.find_stmt_local s table2 in
+  let bound = lem.formula.bound in
+
+  if bound = None || not (Real.is_zero table2 (oget bound)) then
+    Tactics.hard_failure ~loc:(L.loc (snd s))
+      (Failure "rewrite hints must be exact");
+
+  assert (lem.system.pair = None;); (* as we only forward [system.set] below *)
+
+  Hint.add_hint_rewrite s lem.params lem.system.set lem.Goal.formula.formula table2
 
 
 (*------------------------------------------------------------------*)
