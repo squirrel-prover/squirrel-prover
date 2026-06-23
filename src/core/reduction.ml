@@ -577,6 +577,10 @@ module Core : (ReductionCore.Sig with type state = reduction_state) = struct
         | Fun (fs,_), [Int i] when fs = opp table ->
           Term.mk_int Z.(- i), True
 
+        (* Int.( n + -i = n-i ) *)
+        | Fun (fs,_), [i; Int i2] when fs = add table && Z.lt i2 (Z.zero)->
+          Term.(mk_minus table i (mk_int Z.(- i2))), True
+
         (* Int.( = ) *)
         | Fun (fs,_), [Int i1; Int i2] when fs = Symbols.fs_eq ->
           (if Z.equal i1 i2 then Term.mk_true else Term.mk_false), True
