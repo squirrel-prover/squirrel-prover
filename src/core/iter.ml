@@ -387,12 +387,12 @@ module Sp = Symbols.Sp(Symbols.Macro)
 module Mp = Symbols.Mp(Symbols.Macro)
 
 (*------------------------------------------------------------------*)
-module Mset : sig[@warning "-32"]
-  (** Set of macros over some indices.
+module MacroSetAtom : sig[@warning "-32"]
+  (** Set of macros over some vars.
         [{ msymb     = m;
            rec_arg_type = ty;
            args;
-           indices   = vars; 
+           vars   = vars; 
            path_cond = φ; }]
       represents the set of terms
         [\{m(args)@τ | ∀ vars, (τ : ty). s.t. (φ τ) \}]. 
@@ -404,8 +404,8 @@ module Mset : sig[@warning "-32"]
   type t = private {
     msymb        : Term.msymb;
     rec_arg_type : Type.ty;
-    args         : Vars.var list;
-    indices      : Vars.var list;
+    args         : Term.terms;
+    vars         : Vars.var list;
     path_cond    : PathCond.t;
   }
 
@@ -413,46 +413,46 @@ module Mset : sig[@warning "-32"]
     env:Sv.t ->
     rec_arg_type : Type.ty ->    
     msymb:Term.msymb ->
-    args:Vars.var list ->
-    indices:Vars.var list ->
+    args:Term.terms ->
+    vars:Vars.var list ->
     path_cond:PathCond.t -> 
     t
 
   val pp   : t      formatter
   val pp_l : t list formatter
 
-  (** Compute the lub of two msets (w.r.t set inclusion).
-      Must be called on sets with the same macro symbol. *)
-  val join : t -> t -> t
 
-  (** [mset_incl tbl system s1 s2] check if all terms in [s1] are
+  (** [incl tbl system s1 s2] check if all terms in [s1] are
       members of [s2]. *)
   val incl : Symbols.table -> SE.fset -> t -> t -> bool
+
+  val join : t -> t -> t option
+
 end = struct
   type t = {
     msymb        : Term.msymb;
     rec_arg_type : Type.ty;    
-    args         : Vars.var list;
-    indices      : Vars.var list;
+    args         : Term.terms;
+    vars      : Vars.var list;
     path_cond    : PathCond.t;
   }
 
-  let mk ~env ~rec_arg_type ~msymb ~args ~indices ~path_cond : t =
-    let indices = Sv.diff (Sv.of_list1 indices) env in
-    let indices = Sv.elements indices in
-    { msymb; rec_arg_type; args; indices; path_cond; }
+  
+  let mk ~env ~rec_arg_type ~msymb ~args ~vars ~path_cond : t =
+    let vars = Sv.diff (Sv.of_list1 vars) env in
+    let vars = Sv.elements vars in
+    { msymb; rec_arg_type; args; vars; path_cond; }
 
-  let pp fmt (mset : t) =
+  let pp fmt (mset_a : t) =
     Fmt.pf fmt "@[<hv 2>{ @[%a(%a)@]@@_ |@ %a%a}@]"
-      Symbols.pp_path mset.msymb.s_symb
-      Vars.pp_list mset.args
-      Vars.pp_list mset.indices 
-      PathCond.pp mset.path_cond
+      Symbols.pp_path mset_a.msymb.s_symb
+      (Fmt.list Term.pp) mset_a.args
+      Vars.pp_list mset_a.vars 
+      PathCond.pp mset_a.path_cond
 
-  let pp_l fmt (mset_l : t list) =
+  let pp_l fmt (mset_a_l : t list) =
     Fmt.pf fmt "@[<v 0>%a@]"
-      (Fmt.list ~sep:Fmt.sp pp) mset_l
-
+      (Fmt.list ~sep:Fmt.sp pp) mset_a_l
 
   (** Compute the lub of two msets (w.r.t set inclusion).
       Must be called on sets with the same macro symbol.
@@ -460,7 +460,7 @@ end = struct
       A mset is a set of terms of the form:
          [\{m(i₁, ..., iₙ)@τ | ∀ vars, τ \}]
       where [m] is a macro symbol, [τ] is a variable, and
-      [i₁,...,iₙ] are not necessarily distinct index variables that can appear
+      [i₁,...,iₙ] are not necessarily distinct variables that can appear
       in [vars], but don't have to.
 
       Alternatively, a mset is a set of terms of the form:
@@ -468,8 +468,8 @@ end = struct
          [\{m(j₁, ..., jₖ)@τ | ∀ j₁, ..., jₖ s.t.
                                 j₁, ..., jₖ ⊢ E₁, ..., Eₙ ∧ ∀ τ \}]
 
-      where [j₁, ..., jₖ] are *distinct* index variables, and [E₁, ..., Eₙ]
-      are equalities between index variables (not necessarily all in
+      where [j₁, ..., jₖ] are *distinct* variables, and [E₁, ..., Eₙ]
+      are equalities between variables (not necessarily all in
       [j₁, ..., jₖ]).
       Such a set is fully characterized by the symbol [m] (which fixes the
       arity [k]), and by the equalities [E₁, ..., Eₙ].
@@ -485,70 +485,81 @@ end = struct
       test all equalities [G] (there are too many of them). Essentially, we
       check a complete base of such equalities, which fully characterize [Sₗ].
   *)
-  let join (a : t) (b : t) : t =
-    let a_ms, b_ms = a.msymb, b.msymb in
-    assert (a_ms.s_symb = b_ms.s_symb);
+  exception NoJoin
+    
+  let join (a : t) (b : t) : t option =
+    try
+      let a_ms, b_ms = a.msymb, b.msymb in
+      assert (a_ms.s_symb = b_ms.s_symb);
 
-    let l = List.length a.args in
-    (* [arr] will be the vector of indices of the macro symbol we
-       are building *)
-    let arr = Array.make l None in
+      let l = List.length a.args in
+      (* [arr] will be the vector of arguments of the macro symbol we
+         are building *)
+      let arr = Array.make l None in
 
-    (* index variable universally quantified in the final set *)
-    let indices_r = ref [] in
+      (* variable universally quantified in the final set *)
+      let vars_r = ref [] in
 
-    (* we fill [arr], while keeping [indices_r] updated *)
-    Array.iteri (fun i cnt ->
-        match cnt with
-        | Some _ -> ()        (* already filled, nothing to do *)
-        | None ->
-          let v_a = List.nth a.args i in
-          let v_b = List.nth b.args i in
+      (* we fill [arr], while keeping [vars_r] updated *)
+      Array.iteri (fun i cnt ->
+          match cnt with
+          | Some _ -> ()        (* already filled, nothing to do *)
+          | None ->
+            let t_a = List.nth a.args i in
+            let t_b = List.nth b.args i in
+            let univ_var, t =
+              match t_a, t_b with
+              | Term.Var v_a, Term.Var v_b when
+                  not(List.mem v_a a.vars) && not(List.mem v_b b.vars) ->
+                (* [v_a] and [v_b] are constant w.r.t., resp., [a] and [b]
+                   In that case:
+                   - if [v_a] = [v_b] then we use [v_a]
+                   - otherwise, we use a fresh universally quantified var. *)
+                if Term.equal t_a t_b then
+                  None, t_a
+                else
+                  let v' = Vars.refresh v_a in
+                  Some v', Term.mk_var v'
+              | Term.Var v_a, _ when (List.mem v_a a.vars) ->
+                let v' = Vars.refresh v_a in
+                Some v', Term.mk_var v'
+              | _, Term.Var v_b when (List.mem v_b b.vars) ->
+                let v' = Vars.refresh v_b in
+                Some v', Term.mk_var v'
+              | _ -> raise NoJoin
+            in                 
 
-          let univ_var, v =
-            match List.mem v_a a.indices, List.mem v_b b.indices with
-            | false, false ->
-              (* [v_a] and [v_b] are constant w.r.t., resp., [a] and [b]
-                 In that case:
-                 - if [v_a] = [v_b] then we use [v_a]
-                 - otherwise, we must use a fresh universally quantified var. *)
-              if v_a = v_b
-              then false, v_a
-              else true, Vars.make_fresh Type.tindex "i"
+            (* update [vars_r] *)
+            vars_r := (match univ_var with
+                | Some v -> v :: !vars_r
+                | None -> !vars_r);
 
-            (* [v_a] or [v_b] is not a constant.
-               In that case, use a universally quantified variable. *)
-            | true, _ -> true, Vars.refresh v_a
-            | _, true -> true, Vars.refresh v_b
-          in
+            List.iteri2 (fun j u_a u_b ->
+                if u_a = t_a && u_b = t_b then begin
+                  assert (Array.get arr j = None);
+                  Array.set arr j (Some t)
+                end
+              ) a.args b.args
+        ) arr;
 
-          (* update [indices_r] *)
-          indices_r := if univ_var then v :: !indices_r else !indices_r;
+      let join_args = Array.fold_right (fun a acc -> oget a :: acc) arr [] in
+      let join_ms = a_ms in
+      assert (Type.equal a.rec_arg_type b.rec_arg_type);
+      let path_cond = PathCond.join a.path_cond b.path_cond in
+      Some (mk ~env:Sv.empty ~rec_arg_type:a.rec_arg_type
+              ~msymb:join_ms ~args:join_args ~path_cond ~vars:(!vars_r))
+    with NoJoin -> None
 
-          List.iteri2 (fun j u_a u_b ->
-              if u_a = v_a && u_b = v_b then begin
-                assert (Array.get arr j = None);
-                Array.set arr j (Some v)
-              end
-            ) a.args b.args
-      ) arr;
-
-    let join_is = Array.fold_right (fun a acc -> oget a :: acc) arr [] in
-    let join_ms = a_ms in
-    assert (Type.equal a.rec_arg_type b.rec_arg_type);
-    let path_cond = PathCond.join a.path_cond b.path_cond in
-    mk ~env:Sv.empty ~rec_arg_type:a.rec_arg_type
-      ~msymb:join_ms ~args:join_is ~path_cond ~indices:(!indices_r)
-
+  
   let incl table (sexpr : SE.fset) (s1 : t) (s2 : t) : bool =
-    let tv = Vars.make_fresh Type.ttimestamp "t" in
-    let term1 = Term.mk_macro s1.msymb (Term.mk_vars s1.args) (Term.mk_var tv) in
-    let term2 = Term.mk_macro s2.msymb (Term.mk_vars s2.args) (Term.mk_var tv) in
+    let tv = Vars.make_fresh (s1.rec_arg_type) "t" in
+    let term1 = Term.mk_macro s1.msymb s1.args (Term.mk_var tv) in
+    let term2 = Term.mk_macro s2.msymb s2.args (Term.mk_var tv) in
 
     let pat2 = Term.{ 
         pat_op_term   = term2;
         pat_op_params = Params.Open.empty;
-        pat_op_vars   = Vars.Tag.local_vars s2.indices;}
+        pat_op_vars   = Vars.Tag.local_vars s2.vars;}
     in
     let system = SE.reachability_context sexpr in
     match
@@ -560,10 +571,67 @@ end = struct
     | NoMatch _ -> false
     (* TODO: we must check for PathCond inclusion here (with a
        [PathCond.incl] most likely *)
+
 end
 
+
+
+
+module Mset = struct
+  (** Set of macro_set_atom with invariants:
+      - all have the same msymb.
+      - it is minimal w.r.t MacroSetAtom.incl
+  *)
+  
+include Set.Make(struct
+    type t = MacroSetAtom.t
+    let compare = compare
+  end
+  )
+
+
+let join_single (macro_set_atom : MacroSetAtom.t ) (sm : t) : t =
+  let mset, final_msa = 
+    fold (fun macro_set_atom_old (mset_acc, msa_acc) ->
+        (* We try to join the new macro_set_atom with each element in
+           the mset, whenever it succeeds, we continue joining with
+           the new macro_set_atom, we continue and keep the old mset
+           element. At the end, we simply add the final new
+           macro_set_atom.  *)
+      match 
+        MacroSetAtom.join msa_acc macro_set_atom_old
+      with
+      | Some msa -> (mset_acc, msa)
+      | None -> (add macro_set_atom_old mset_acc, msa_acc)
+      ) sm (empty, macro_set_atom)
+  in
+  add final_msa mset
+    
+
+let join (sm1 : t) (sm2 : t) =
+  fold (fun mset acc -> join_single mset acc) sm1 sm2
+
+let incl (table : Symbols.table) (sexpr : SE.fset) (sm1 : t) (sm2 : t) =
+  for_all
+    (fun m1 -> exists
+        (fun m2 ->  MacroSetAtom.incl table sexpr m1 m2) sm2) sm1
+
+(** [diff ... sm1 sm2] over-approximates [sm1 \ sm2]. *)
+let diff (table : Symbols.table) (sexpr : SE.fset) (sm1 : t) (sm2 : t) =
+  filter
+    (fun m1 ->
+       not( exists
+              (fun m2 -> MacroSetAtom.incl table sexpr m1 m2) sm2)) sm1
+
+let pp fmt (mset : t) =
+  Fmt.pf fmt "%a" (Fmt.list MacroSetAtom.pp) (elements mset)
+
+end
+  
+
 module MsetAbs : sig[@warning "-32"]
-  (** Abstract value containing one mset per macro symbol. *)
+  (** Abstract value mainting for each macro symbol the smallest set
+      of msets possible. *)
   type t = (Symbols.macro * Mset.t) list
 
   val pp : t formatter
@@ -590,14 +658,21 @@ end = struct
     in
     Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list ~sep:Fmt.cut pp_one) abs
 
-  let join_single (mset : Mset.t) (msets : t) : t =
-    let name = mset.msymb.s_symb in
-    if List.mem_assoc name msets then
-      List.assoc_up name (fun b -> Mset.join mset b) msets
-    else (name, mset) :: msets
+  let join_single (mset : Mset.t) (all_msets : t) : t =
+    if mset = Mset.empty then all_msets else
+      let name = (Mset.min_elt mset).msymb.s_symb in
+      if List.mem_assoc name all_msets then
+        let msets = List.assoc name all_msets in
+        let new_s =
+          Mset.join mset msets
+        in
+        List.assoc_up name (fun _ -> new_s) all_msets 
+      else (name, mset) :: all_msets
 
   let join (abs1 : t) (abs2 : t) : t =
-    List.fold_left (fun abs (_, mset) -> join_single mset abs) abs1 abs2
+    List.fold_left (fun abs (_, mset) ->
+       join_single mset abs
+      ) abs1 abs2
 
   let incl
       (table  : Symbols.table)
@@ -605,10 +680,10 @@ end = struct
       (abs1   : t)
       (abs2   : t) : bool
     =
-    List.for_all (fun (mn, m1) ->
+    List.for_all (fun (mn, sm1) ->
         try
-          let m2 = List.assoc mn abs2 in
-          Mset.incl table system m1 m2
+          let sm2 = List.assoc mn abs2 in
+          Mset.incl table system sm1 sm2
         with Not_found -> false
       ) abs1
 
@@ -618,12 +693,16 @@ end = struct
       (abs1   : t)
       (abs2   : t) : t
     =
-    List.filter (fun (mn, m1) ->
+    List.fold_left (fun acc (mn, sm1) ->
         try
-          let m2 = List.assoc mn abs2 in
-          not (Mset.incl table system m1 m2)
-        with Not_found -> true
-      ) abs1
+          let sm2 = List.assoc mn abs2 in 
+          let new_sm1 = Mset.diff table system sm1 sm2 in
+          if new_sm1 = Mset.empty then
+            acc
+          else
+            (mn, new_sm1)  :: acc
+        with Not_found -> (mn,sm1) :: acc
+      ) abs1 []
 
   let mem
       (sym : Symbols.macro)
@@ -656,7 +735,7 @@ let default_expand_mode
     (* and if the macro is some fixed list of already explored macros *)
     not(List.mem_assoc ms.s_symb mset)
     (* TODO: this should be replaced by a mset membership tests. 
-       [{msymb; args; indices = []; path_c
+       [{msymb; args; vars = []; path_c
        ond = Top} ⊆ List.assoc ms mset]
 
        Note: the role of [path_cond] needs to be clarified
@@ -893,19 +972,32 @@ let get_macro_occs
 (*------------------------------------------------------------------*)
 (** Given a macro occurrence [occ], compute a [Mset.t] value that 
     abstracts it:
-    - over-approximations occur whenever the macro occurrence is indexed by 
-      complex terms (i.e. not variables). *)
-let mset_of_macro_occ (env : Sv.t) ~(path_cond : PathCond.t) (occ : macro_occ) : Mset.t =
-  let indices = 
-    List.map (function
-        | Term.Var v -> v
-        | _ as t -> Vars.make_fresh (Term.ty t) "i" 
-        (* over-approximation, replacing the term by an fresh variable *)
-        (* FEATURE: a more complex abstract domain could do more here *)
-      ) occ.occ_cnt.args 
+    
+    - we cannot replace anything that may contain a diff or a name by
+    a variable, as it would then hide occurences (forbidden variables
+    that may hide occurences have been identified in other steps, and
+    not are not checked anymore once we recurse in macros for indirect
+    occurences).
+    
+    - however, we can replace const or adv variables by a fresh
+    variable not bound later on in the env, allowing to potentially
+    unify together e.g. two distinct macro occurences with a distinct
+    const index variable, that should map to a single mset.
+*)
+let mset_of_macro_occ (env : Vars.env) ~(path_cond : PathCond.t) (occ : macro_occ) : Mset.t =
+  let env = Vars.to_vars_set env in
+  (* we collect the potential free variables in the arguments (which
+     might have been introduced by MacroSetAtom.join operations). *)
+  let vars = List.fold_left
+      (fun vars x ->
+      match x with
+      | Term.Var v -> v :: vars
+      | _ -> vars) [] occ.occ_cnt.args
   in
-  Mset.mk ~env ~rec_arg_type:occ.occ_cnt.rec_arg_type
-    ~msymb:occ.occ_cnt.symb ~args:indices ~indices ~path_cond
+  (* let args = List.map (Term.subst subst) occ.occ_cnt.args in *)
+  Mset.singleton @@
+  MacroSetAtom.mk ~env ~rec_arg_type:occ.occ_cnt.rec_arg_type
+    ~msymb:occ.occ_cnt.symb ~args:occ.occ_cnt.args ~vars ~path_cond
 
 (*------------------------------------------------------------------*)
 (** Return an over-approximation of the macros reachable from a term
@@ -936,12 +1028,13 @@ let macro_support
       ~(fv          : Vars.vars)  (* additional [fv] not in [env.vars] *)
       (term         : Term.term) 
     : MsetAbs.t 
-    = 
+    =
+    Printer.prt `Default "@.term: %a@." Term.pp_dbg term;
     assert (Sv.subset (Term.fv term) (Sv.union (Vars.to_vars_set env.vars) (Sv.of_list fv)));
 
     let occs = get_macro_occs ~mode ~context ~fv term in
     let msets =
-      List.map (mset_of_macro_occ (Vars.to_vars_set env.vars) ~path_cond) occs
+      List.map (mset_of_macro_occ env.vars ~path_cond) occs
     in
     List.fold_left (fun abs mset -> MsetAbs.join_single mset abs) [] msets
   in
@@ -953,57 +1046,58 @@ let macro_support
   in
 
   let do1 (sm : MsetAbs.t) : MsetAbs.t =
-    List.fold_left (fun acc ((_,mset) : _ * Mset.t) ->       
-        let tv_var = Vars.make_fresh mset.rec_arg_type "tau" in
-        let tv = Term.mk_var tv_var in
-        match
-          Macros.unfold ~unfold_opaque:true env mset.msymb (Term.mk_vars mset.args) tv 
-        with
-        | `Results res ->
-          List.fold_left (fun acc (obody : Macros.body) ->
-              let body : Macros.body = Macros.refresh_body obody in
-              match body.pattern with
-              | None ->
-                (* If there is no matching, then we simply collect the
-                   new_occs and join everything. *)
-                let get_new_occ t =
-                  (* We keep the [path_cond] unchanged as there is no pattern. *)
-                  get_msymbs ~path_cond:mset.path_cond ~fv:(tv_var :: mset.args @ mset.indices) t
-                in
-                MsetAbs.join
-                  (get_new_occ @@ 
-                   Term.mk_ite
-                     body.when_cond
-                     body.out
-                     (Library.Prelude.mk_witness table ~ty_arg:(Term.ty body.out)))
-                  acc
-
-              | Some pat ->
-                let fv = List.rev_append body.vars (tv_var :: mset.args @ mset.indices) in
-                let new_path_cond =
-                  match Term.destr_action pat with
-                  | None -> mset.path_cond
-                  (* FIXME: [path_cond] should become 
-                     [PathCond.join mset.path_cond (new_pat = body.pattern)] *)
-                  | Some  (asymb, tl) -> 
-                    let act = Action.of_term asymb tl table in
-                    let descr, subst = SE.descr_of_action table system act in
-                    PathCond.concat ~all_actions
-                      (PathCond.Before [Action.subst_descr subst descr]) mset.path_cond 
-                in
-                let get_new_occ t =
-                  get_msymbs ~path_cond:new_path_cond ~fv t
-                in          
-                MsetAbs.join
-                  (get_new_occ @@
-                   Term.mk_ite
-                     body.when_cond
-                     body.out
-                     (Library.Prelude.mk_witness table ~ty_arg:(Term.ty body.out)))
-                  acc                                    
-            ) acc res
-        | `Unknown -> assert false (* FIXME: use a soft failure  *)
-      ) sm sm
+    List.fold_left (fun acc1 ((_,smset) : _ * Mset.t) ->
+        Mset.fold (fun mset acc ->
+            let tv_var = Vars.make_fresh mset.rec_arg_type "tau" in
+            let tv = Term.mk_var tv_var in
+            match
+              Macros.unfold ~unfold_opaque:true env mset.msymb mset.args tv 
+            with
+            | `Results res ->
+              List.fold_left (fun acc (obody : Macros.body) ->
+                  let body : Macros.body = Macros.refresh_body obody in
+                  match body.pattern with
+                  | None ->
+                    (* If there is no matching, then we simply collect the
+                       new_occs and join everything. *)                 
+                    let get_new_occ t =
+                      (* We keep the [path_cond] unchanged as there is no pattern. *)
+                      get_msymbs ~path_cond:mset.path_cond ~fv:(tv_var :: mset.vars) t
+                    in
+                    MsetAbs.join
+                      (get_new_occ @@ 
+                       Term.mk_ite
+                         body.when_cond
+                         body.out
+                         (Library.Prelude.mk_witness table ~ty_arg:(Term.ty body.out)))
+                      acc
+                      
+                  | Some pat ->
+                    let fv = List.rev_append body.vars (tv_var :: mset.vars) in
+                    let new_path_cond =
+                      match Term.destr_action pat with
+                      | None -> mset.path_cond
+                      (* FIXME: [path_cond] should become 
+                         [PathCond.join mset.path_cond (new_pat = body.pattern)] *)
+                      | Some  (asymb, tl) -> 
+                        let act = Action.of_term asymb tl table in
+                        let descr, subst = SE.descr_of_action table system act in
+                        PathCond.concat ~all_actions
+                          (PathCond.Before [Action.subst_descr subst descr]) mset.path_cond 
+                    in
+                    let get_new_occ t =
+                      get_msymbs ~path_cond:new_path_cond ~fv t
+                    in          
+                    MsetAbs.join
+                      (get_new_occ @@
+                       Term.mk_ite
+                         body.when_cond
+                         body.out
+                         (Library.Prelude.mk_witness table ~ty_arg:(Term.ty body.out)))
+                      acc                                    
+                ) acc res
+            | `Unknown -> assert false (* FIXME: use a soft failure  *)
+          ) smset acc1) sm sm
   in
 
   let abs_incl = MsetAbs.incl table system in
@@ -1052,7 +1146,7 @@ let fold_macro_support
   let env = context.env in
   let table = env.table in
   let venv = Vars.to_vars_set env.vars in
-
+  
   (* association list of terms and their macro support *)
   let direct_sm, (indirect_sm : (Term.term * MsetAbs.t) list) =
     List.fold_left (fun (dir_acc, ind_acc) src ->
@@ -1071,7 +1165,7 @@ let fold_macro_support
   (*------------------------------------------------------------------*)
   (* debug printing *)
   if TConfig.debug_macros table then
-    (List.iter (fun (sr, mset_abs) -> 
+     (List.iter (fun (sr, mset_abs) -> 
          Fmt.epr "indirect macro_support of source %a :@.%a@." 
            Term.pp_dbg sr MsetAbs.pp mset_abs
        ) indirect_sm;
@@ -1094,7 +1188,16 @@ let fold_macro_support
             else Mp.add src_macro ([src], mset) macro_occs
           ) macro_occs src_macros
       ) Mp.empty indirect_sm
-  in 
+  in
+
+  (*------------------------------------------------------------------*)
+  (* debug printing *)
+  if TConfig.debug_macros table then
+     List.iter (fun (msymb, (srcs, mset)) -> 
+         Fmt.epr "Macro %a with sources %a in %a@.@." 
+           Symbols.pp_path msymb (Fmt.list Term.pp) srcs Mset.pp mset
+       ) (Mp.bindings macro_ind_occs);
+
 
   (*------------------------------------------------------------------*)
   (* run some checks on the recursive functions involved *)
@@ -1172,39 +1275,40 @@ let fold_macro_support
 
   (*------------------------------------------------------------------*)
   List.fold_left
-    (fun acc (_, ((srcs, mset) : _ * Mset.t)) ->
-       let tv_var = Vars.make_fresh mset.rec_arg_type "t" in
-       let tv = Term.mk_var tv_var in 
-       match Macros.unfold ~unfold_opaque:true env mset.msymb (Term.mk_vars mset.args) tv with
-       | `Results res ->
-         List.fold_left (fun acc (obody : Macros.body) ->
-             let (body : Macros.body) = Macros.refresh_body obody in
-             let iocc_rec_arg = (odflt tv body.pattern) in
-
-             let out_iocc_vars = 
-               Sv.diff (Term.fv (Term.mk_tuple [body.out; body.when_cond; iocc_rec_arg]))
-                 venv
-             in
-
-             let iocc_out = {
-               iocc_fun             = mset.msymb.s_symb;
-               iocc_vars            = out_iocc_vars;
-               iocc_rec_arg;
-               iocc_cnt             = body.out;
-               iocc_cond            = body.when_cond;
-               iocc_sources         = srcs;
-               iocc_path_cond       = mset.path_cond;
-               (* TODO: here, path_cond could have been built in a smarter
-                  way, accumulating the when_cond of all macros on the
-                  path. *)
-               iocc_explored_macros = mset_indirects;
-             } in
-             if TConfig.debug_macros table then
-               Printer.prt `Default "@.ioccout: %a@." pp_iocc iocc_out;
-             func iocc_out acc
-           )
-           acc res
-       | `Unknown -> assert false
+    (fun acc0 (_, ((srcs, mset) : _ * Mset.t)) ->
+       Mset.fold (fun mset_a acc ->
+           let tv_var = Vars.make_fresh mset_a.rec_arg_type "t" in
+           let tv = Term.mk_var tv_var in 
+           match Macros.unfold ~unfold_opaque:true env mset_a.msymb mset_a.args tv with
+           | `Results res ->
+             List.fold_left (fun acc (obody : Macros.body) ->
+                 let (body : Macros.body) = Macros.refresh_body obody in
+                 let iocc_rec_arg = (odflt tv body.pattern) in
+                 
+                 let out_iocc_vars = 
+                   Sv.diff (Term.fv (Term.mk_tuple [body.out; body.when_cond; iocc_rec_arg]))
+                     venv
+                 in
+                 
+                 let iocc_out = {
+                   iocc_fun             = mset_a.msymb.s_symb;
+                   iocc_vars            = out_iocc_vars;
+                   iocc_rec_arg;
+                   iocc_cnt             = body.out;
+                   iocc_cond            = body.when_cond;
+                   iocc_sources         = srcs;
+                   iocc_path_cond       = mset_a.path_cond;
+                   (* TODO: here, path_cond could have been built in a smarter
+                      way, accumulating the when_cond of all macros on the
+                      path. *)
+                   iocc_explored_macros = mset_indirects;
+                 } in
+                 if TConfig.debug_macros table then
+                   Printer.prt `Default "@.ioccout: %a@." pp_iocc iocc_out;
+                 func iocc_out acc
+               ) acc res
+           | `Unknown -> assert false
+         ) mset acc0
     )
     init
     (Mp.bindings macro_ind_occs)

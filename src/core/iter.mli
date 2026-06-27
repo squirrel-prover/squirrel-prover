@@ -148,42 +148,9 @@ module PathCond : sig
 end
 
 module Mset : sig[@warning "-32"]
-  (** Set of macros over some indices.
-        [{ msymb     = m;
-           rec_arg_type=ty;           
-           args;
-           indices   = vars; 
-           path_cond = φ; }]
-      represents the set of terms [\{m(args)@τ | ∀ vars, τ s.t. (φ τ) \}]. 
 
-      It is guaranteed that [vars ∩ env = ∅]. *)
-  type t = private {
-    msymb        : Term.msymb;
-    rec_arg_type : Type.ty ;
-    args         : Vars.var list;
-    indices      : Vars.var list;
-    path_cond    : PathCond.t;
-  }
-
-  val mk :
-    env:Sv.t ->
-    rec_arg_type : Type.ty ->
-    msymb:Term.msymb ->
-    args:Vars.var list ->
-    indices:Vars.var list ->
-    path_cond:PathCond.t -> 
-    t
-
-  val pp   : t      formatter
-  val pp_l : t list formatter
-
-  (** Compute the lub of two msets (w.r.t set inclusion).
-      Must be called on sets with the same macro symbol. *)
-  val join : t -> t -> t
-
-  (** [mset_incl tbl system s1 s2] check if all terms in [s1] are
-      members of [s2]. *)
-  val incl : Symbols.table -> SE.fset -> t -> t -> bool
+  type t
+  
 end
 
 module MsetAbs : sig[@warning "-32"]
