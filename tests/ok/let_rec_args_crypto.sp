@@ -30,9 +30,8 @@ global lemma _ (ts : _ [const]) (i,j:index [const]) :
 equiv( t diff(i,j) @ ts).
 Proof.
 crypto Empty.
-checkfail assumption exn NotHypothesis.
-have _ : not(init <= ts) || not(true) by admit.
-assumption.
+have F : not(init <= ts) || not(true) by admit.
+assumption F.
 Qed.
 
 
@@ -52,9 +51,8 @@ Abort.
 global lemma _ (ts:timestamp [const]) : equiv(zeros'' diff(k,k2) ts,k).
 Proof.
  fresh 1. 
- + checkfail assumption exn NotHypothesis. 
-   have _ : forall (t:timestamp), t <= ts => t = init || not(happens(t)) => false  by admit. 
-   assumption.
+ + have F : forall (t:timestamp), t <= ts => t = init || not(happens(t)) => false  by admit. 
+   assumption F.
  + admit.
 Qed.
 
@@ -63,15 +61,14 @@ global lemma _ (ts:timestamp [const]) : equiv(zeros'' k ts,diff(k,k2)).
 Proof.
  fresh 1. 
  + checkfail assumption exn NotHypothesis. 
-   have _ : forall (t:timestamp), t <= ts => t = init || not(happens(t)) => false  by admit.
-   assumption.
+   have F : forall (t:timestamp), t <= ts => t = init || not(happens(t)) => false  by admit.
+   assumption F.
  + crypto Empty.   
 Qed.
 
 global lemma _ (ts:timestamp [const]) : equiv(zeros'' k ts,diff(k,k2)).
 Proof.
  crypto Fresh (n1:k) (n2:k2).
- checkfail assumption exn NotHypothesis.
- have _ : forall (t:timestamp), (t = init || not(happens(t))) && t <= ts => false by admit.
- assumption.
+ have F : forall (t:timestamp), (t = init || not(happens(t))) && t <= ts => false by admit.
+ assumption F.
 Qed.
