@@ -1029,7 +1029,6 @@ let macro_support
       (term         : Term.term) 
     : MsetAbs.t 
     =
-    Printer.prt `Default "@.term: %a@." Term.pp_dbg term;
     assert (Sv.subset (Term.fv term) (Sv.union (Vars.to_vars_set env.vars) (Sv.of_list fv)));
 
     let occs = get_macro_occs ~mode ~context ~fv term in
