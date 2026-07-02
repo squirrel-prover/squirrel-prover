@@ -1,5 +1,5 @@
 include Core.
-set smtSteps=10000.
+set smtSteps=20000.
 
 abstract ok : message. 
 mutable s(i:index) : message = ok.

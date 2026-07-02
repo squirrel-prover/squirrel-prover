@@ -6,6 +6,7 @@
     Other arguments allow to tweak this translation. *)
 val is_valid :
   macro_axioms:bool ->
+  operator_axioms:bool ->
   timeout:int ->
   steps:int option -> 
   provers:(string*string) list->

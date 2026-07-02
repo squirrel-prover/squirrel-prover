@@ -67,7 +67,7 @@ is proved on the ideal system. The reach equiv
 tactic allows one to combine these two steps, and to conclude.
 *******************************************************************************)
 set timeout=10.
-
+set smtSteps = 3000000.
 (* AEAD symmetric encryption scheme: IND-CCA + INT-CTXT *)
 senc enc,dec.
 
@@ -315,7 +315,7 @@ lemma counterIncrease (t:timestamp, pid : index) :
     SCtr(pid)@pred(t) ~< SCtr(pid)@t ||
     SCtr(pid)@t = SCtr(pid)@pred(t).
 Proof.
- smt  ~steps:33559.
+ smt  ~no_operators.
 Qed.
 
 (* The counter SCpt(ped) increases (not strictly) between t' and t
@@ -328,7 +328,7 @@ lemma counterIncreaseBis:
       SCtr(pid)@t = SCtr(pid)@t').
 Proof.
   induction.
-  use counterIncrease; smt ~prover:CVC5  ~steps:36700.
+  use counterIncrease; smt ~no_operators.
 Qed.
 
 (*------------------------------------------------------------------------------
@@ -343,7 +343,7 @@ lemma noreplayInv (j, j', pid:index):
    SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j').
 Proof.
   use counterIncreaseBis.  
-  smt ~prover:CVC5 ~steps:500000. 
+  smt ~no_operators. 
 Qed.
 
 lemma noreplay (j, j', pid:index):
@@ -354,7 +354,7 @@ lemma noreplay (j, j', pid:index):
   j = j'.
 Proof.
   use noreplayInv.
- smt ~prover:CVC5 ~steps:30000. 
+ smt ~no_operators. 
 Qed.
 
 (*------------------------------------------------------------------*)
@@ -364,7 +364,7 @@ lemma monotonicity (j, j', pid:index):
   SCtr(pid)@Server(pid,j) ~< SCtr(pid)@Server(pid,j') =>
   Server(pid,j) < Server(pid,j').
 Proof.
- use noreplayInv. smt ~prover:CVC5 ~steps:250000.
+ use noreplayInv. smt ~no_operators.
 Qed.
 
 
@@ -429,7 +429,7 @@ lemma valid_decode_charac (t : timestamp) (pid,j : index):
     fst(dec(otp@t,k(pid))) = sid(pid) ).
 Proof.
 use valid_decode.
-project; smt  ~steps:51412.
+project; smt  ~no_operators.
 Qed.
 
 
@@ -442,7 +442,7 @@ lemma if_aux (b,b0,b1 : boolean) (x,y,z,u,v:message):
    if b && (x = y && b0) && b1 then
     snd(dec(z,diff(fst(dec(x,u)),v))).
 Proof. 
-project; smt  ~steps:27995. 
+project; smt  ~no_operators. 
 Qed.
 
 set showStrengthenedHyp=true.
@@ -482,11 +482,11 @@ Proof.
       (fun (pid0 : index) => pid = pid0 && Setup(pid0) <= t) (AEAD(pid)@t)
       (fun (pid0 : index) => pid <> pid0 ||
                           (pid = pid0 && not (Setup(pid0) <= t))) zero.
-      - simpl;smt  ~steps:23718.
-      - simpl;smt  ~steps:25261.
+      - simpl;smt ~no_operators.
+      - simpl;smt ~no_operators.
       - rewrite if_then_then in 3.
         assert (forall(pid0 : index), (not (pid = pid0) && Setup(pid0) <= t) = (Setup(pid0) < t))
-        as H. smt  ~steps:30000.
+        as H. smt  ~no_operators.
         rewrite /= H -le_pred_lt in 3.
         rewrite /AEAD in 1.
         fa 1.
@@ -517,7 +517,7 @@ Proof.
            2: enc (tlen, rinit pid, keyFresh) ; simpl ~diffr. {
            rewrite Eq_len.
            crypto ~no_subgoal_on_failure Enckp (k0: mkey) (k1: keyFresh) => //.
-            smt ~no_macros. 
+            smt ~no_macros ~no_operators. 
          }
          rewrite Eq_len.
          fa 2; fa 2.
@@ -537,7 +537,7 @@ Proof.
             enc (tlen, rinit(pid), diff(keyFresh, mkey)) by project.
           rewrite Eq_len. 
           crypto ~no_subgoal_on_failure Enckp (k1: mkey) (k0: keyFresh) => //.
-          smt ~no_macros. 
+          smt ~no_macros ~no_operators. 
 
   + (* Decode(pid,j) *)
     repeat destruct Eq as [_ Eq].
@@ -595,7 +595,7 @@ Proof.
   use max_ts as [_ U].
   split; 1: auto.
   split.
-    + smt  ~steps:24446. 
+    + smt  ~no_operators. 
     + by apply ~inductive equiv_real_ideal_enrich tmax.
 Qed.
 
@@ -629,7 +629,7 @@ Proof.
   use equiv_real_ideal_enrich_tmax0 as [Hap C U].
   split; 1: auto.
   split; 1: auto.
-  assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq. smt  ~steps:30000.
+  assert (forall (t' : timestamp), (t' <= tmax) = happens(t')) as Eq. smt ~no_operators.
   rewrite !Eq in U.
 
   splitseq 3: (fun (i : index, t' : timestamp) => happens(t')).
@@ -640,19 +640,19 @@ Proof.
   constseq 6 :
     (fun (i : index, t' : timestamp) => happens(t')) zero
     (fun (i : index, t' : timestamp) => not (happens(t'))) empty. 
-    + simpl; smt  ~steps:23391.
-    + simpl. smt  ~steps:30000.   
+    + simpl; smt ~no_operators.
+    + simpl. smt  ~no_operators.   
 
     + constseq 4 :
       (fun (i : index, t' : timestamp) => happens(t')) zero
       (fun (i : index, t' : timestamp) => not (happens(t'))) empty.
-        - simpl; smt  ~steps:23391.
-        - simpl; smt  ~steps:30000.
+        - simpl; smt ~no_operators.
+        - simpl; smt  ~no_operators.
        - constseq 2 :
         (fun (t' : timestamp) => happens(t')) false
         (fun (t' : timestamp) => not (happens(t'))) exec_dflt.
-          * simpl;smt  ~steps:23391.
-          * simpl;smt  ~steps:30000.
+          * simpl;smt  ~no_operators.
+          * simpl;smt  ~no_operators.
           * by apply U.
 Qed.
 
@@ -699,5 +699,5 @@ Proof.
 
   intro j' Hap' Hexec'.
   use counterIncreaseBis as HH. 
-  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) as H => //. smt ~prover:Z3 ~steps:629900.
+  assert (Server(pid,j) = Server(pid,j') || Server(pid,j) < Server(pid,j') || Server(pid,j) > Server(pid,j')) as H => //. smt ~no_operators.
 Qed.

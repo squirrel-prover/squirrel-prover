@@ -1,5 +1,7 @@
 channel c
 abstract ok: message.
+set smtSteps = 10000.
+
 
 include Core.
 
@@ -41,15 +43,15 @@ Proof.  by rewrite  cond_init.  Qed.
 
 (* This axiom is true in any system in the theory behind Squirrel but can not be established using the auto tactic *)
 lemma [any] ax2_macro: forall t:timestamp, cond@t => happens t.
-Proof. smt ~prover:CVC5 ~steps:1744. Qed.
+Proof. smt ~prover:CVC5. Qed.
 
 (* Same here *)
 lemma [any] ax3_macro: forall t:timestamp, ((not(happens(t)) || t= init) => (input@t = empty)).
-Proof. intro *. case H. smt ~prover:CVC5 ~steps:1787. rewrite H. smt ~prover:CVC5 ~steps:1624.  Qed.
+Proof. intro *. case H. smt ~prover:CVC5. rewrite H. smt ~prover:CVC5.  Qed.
 
 (* Same here *)
 lemma [any] ax4_macro: forall t:timestamp, not(not(happens(t)) || t= init) => input@t = att(frame@(pred t)).
-Proof. smt ~prover:CVC5 ~steps:1770. Qed.
+Proof. smt ~prover:CVC5. Qed.
 
 (* Same here *)
 lemma [any] ax5_macro: forall t:timestamp, (t = init) => (frame@t) = zero.
@@ -67,4 +69,4 @@ Proof. smt.  Qed.
 
 (* Same here *)
 lemma [any] ax7_macro: forall t:timestamp, (exec@t) <=> (t = init || (exec@(pred t) && cond@t)).
-Proof. smt ~prover:CVC5 ~steps:2356. Qed.
+Proof. smt ~prover:CVC5. Qed.

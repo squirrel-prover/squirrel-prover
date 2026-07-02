@@ -1,5 +1,5 @@
 include Core.
-set smtSteps = 200000.
+set smtSteps = 3000000.
 
 abstract tau:index*index->timestamp.
 
@@ -39,12 +39,12 @@ abstract f : index -> message.
 lemma [any] _ :
   (try find i j such that f i = empty in <f i, f j>) =
   (try find i j such that f i = empty in <empty, f j>).
-Proof. smt ~prover:CVC5. Qed.
+Proof. smt ~prover:Z3_noBV ~no_macros. Qed.
 
 lemma [any] introTryFind :
   forall x:message, forall m:index -> index -> message, 
    x = try find i j such that x = m i j in m i j else x. 
-Proof. smt ~prover:CVC5. Qed.
+Proof. smt ~prover:Z3_noBV ~no_macros. Qed.
 
 
 
@@ -56,7 +56,7 @@ lemma[any] _ : (not (g true || g false) => h) => (try find x such that (g x) in 
 
 lemma[any] _ : (not (g true || g false) => h) => 
   (try find x y z such that (g x) && y && z in (g x) else h).
- Proof. smt ~prover:CVC5. Qed.
+ Proof. smt  ~no_macros ~no_operators. Qed.
 
 
 

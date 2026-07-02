@@ -1679,8 +1679,35 @@ let add_hint ~(exact:bool) context system (hint:Hint.smt_hint) =
       end
     end
     
+let add_operator_definition context = 
+  Symbols.Operator.iter
+    (fun fname _ ->
+      if Operator.is_concrete_operator context.table fname then
+      let c_operator = Operator.get_concrete_data context.table fname in 
+      begin
+        let sq_args = (List.map Term.mk_var c_operator.args)
+        in
+        let sq_app = 
+          Term.mk_fun 
+            context.table 
+            c_operator.name 
+            ~ty_args:(List.map Type.tvar c_operator.ty_vars)
+            sq_args
+        in let sq_eq = Term.mk_eq 
+              (sq_app)
+              (c_operator.body)
+        in let sq_axiom = 
+          Term.mk_forall c_operator.args (sq_eq)
+        in 
+        add_why_axiom
+          context 
+          (sqterm_to_wfmla context sq_axiom) 
+          (id_fresh context (path_to_string c_operator.name))
+      end
+    ) context.table
+
 let build_task
-    ~macro_axioms ~poly ~exact ~hint_tables
+    ~macro_axioms ~operator_axioms ~poly ~exact ~hint_tables
     (env : Env.t) (table : Symbols.table) (system : SE.t)
     evars hypotheses hints conclusion tm_theory
   =
@@ -1696,6 +1723,7 @@ let build_task
   add_macros context;
   add_names context;
   add_equational_axioms context;
+  if operator_axioms then add_operator_definition context;
   List.iter
     (fun hint_table -> 
       List.iter
@@ -1759,7 +1787,7 @@ let unique_id =
   fun () -> incr id ; !id
 
 let is_valid
-    ~macro_axioms ~timeout ~steps ~provers ~cmd_flag
+    ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag
     ~(poly : bool) ~(exact : bool) (* [poly] refers to polymorphism *)
     ~hint_tables
     sqenv table system evars hypotheses hints conclusion
@@ -1775,7 +1803,7 @@ let is_valid
   let task =
     build_task
       ~poly ~exact
-      ~macro_axioms ~hint_tables
+      ~macro_axioms ~operator_axioms ~hint_tables
       sqenv table system
       evars hypotheses hints conclusion
       theory
@@ -1798,7 +1826,7 @@ let is_valid
 
 (** Validity checking for a sequent, taking into account both kinds of
     hypotheses and [TraceSequent.bound]. *)
-let sequent_is_valid ~macro_axioms
+let sequent_is_valid ~macro_axioms ~operator_axioms
     ~timeout ~steps ~provers ~cmd_flag ~poly ~hint_tables
     (s:TraceSequent.t) : bool
   =
@@ -1847,13 +1875,13 @@ let sequent_is_valid ~macro_axioms
       (LowTraceSequent.Hyps.to_list s)
   and hints = Hint.get_smt_db table in
   let conclusion = LowTraceSequent.conclusion s in
-  is_valid ~macro_axioms ~poly ~exact ~hint_tables
+  is_valid ~macro_axioms ~operator_axioms ~poly ~exact ~hint_tables
     ~timeout ~steps ~provers ~cmd_flag
     env table system evars hypotheses hints conclusion
 
 (* Wrap [sequent_is_valid] to handle diff operators
    by calling previous [sequent_is_valid] on each projection of the goal. *)
-let sequent_is_valid ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
+let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
   ~hint_tables goal
 =
   let list_sequent =
@@ -1865,18 +1893,18 @@ let sequent_is_valid ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
     List.for_all
       (fun s ->
         sequent_is_valid
-          ~macro_axioms ~timeout
+          ~macro_axioms ~operator_axioms ~timeout
           ~steps ~provers ~cmd_flag ~poly ~hint_tables s)
       list_sequent
 
 (* Wrap [sequent_is_valid] in a fork to avoid memory leaks. *)
-let sequent_is_valid ~macro_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
+let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
   ~hint_tables s
 =
   match Unix.fork () with
   | 0 ->
     begin match
-      sequent_is_valid ~macro_axioms ~timeout
+      sequent_is_valid ~macro_axioms ~operator_axioms ~timeout
         ~steps ~provers ~cmd_flag ~poly ~hint_tables s
     with
     | true -> exit 0
@@ -1895,6 +1923,7 @@ type parameters = {
   steps : int option;
   provers : (string*string) list;
   macro_axioms : bool (** [true] when macro axioms should be sent to solvers *);
+  operator_axioms:bool;
   poly : bool;
   hint_tables: string list;
 }
@@ -1925,6 +1954,7 @@ let default_parameters table = {
       None;
   provers = all_provers;
   macro_axioms = true;
+  operator_axioms = true;
   poly = true;
   hint_tables = ["default"];
 }
@@ -1968,6 +1998,9 @@ let parse_arg parameters = let open TacticsArgs in function
     { parameters with steps=Some s}
   | NArg {Location.pl_desc="no_macros"} ->
     { parameters with macro_axioms = false }
+  | NArg {Location.pl_desc="no_operators"} ->
+    { parameters with operator_axioms = false }
+
   | NArg {Location.pl_desc="no_poly"} ->
     { parameters with poly = false }
 
@@ -2002,7 +2035,7 @@ let () =
          in
          let table = (TraceSequent.env s).table in
          let {timeout;steps;
-              provers;macro_axioms;poly;hint_tables} =
+              provers;macro_axioms;operator_axioms;poly;hint_tables} =
            parse_args args table
          in
          let cmd_flag = match provers with
@@ -2010,7 +2043,7 @@ let () =
            | _ -> ""
          in
          if
-           sequent_is_valid ~macro_axioms ~timeout
+           sequent_is_valid ~macro_axioms ~operator_axioms ~timeout
              ~steps ~provers ~cmd_flag ~poly ~hint_tables s
          then
            sk [] fk
@@ -2070,6 +2103,7 @@ let () =
                   in
                   sequent_is_valid
                     ~macro_axioms:true
+                    ~operator_axioms:true
                     ~timeout:10
                     ~steps:None
                     ~provers:[prover,alt]
@@ -2087,6 +2121,7 @@ let () =
               (fun s ->
                   sequent_is_valid
                     ~macro_axioms:true
+                    ~operator_axioms:true
                     ~timeout:1
                     ~steps:None
                     ~provers:[prover,alt]
@@ -2115,6 +2150,7 @@ let () =
               (fun (_,s) ->
                     sequent_is_valid
                       ~macro_axioms:true
+                      ~operator_axioms:true
                       ~timeout:10
                       ~steps:None
                       ~provers:[prover,alt]

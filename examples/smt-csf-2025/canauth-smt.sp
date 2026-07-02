@@ -21,6 +21,7 @@ SECURITY PROPERTIES
 - authentication
 - injectivity
 *******************************************************************************)
+set smtSteps = 300000.
 
 hash hmac
 
@@ -127,7 +128,7 @@ lemma counterIncreaseA (t, t':timestamp, i:index):
   ( cellA(i)@t' ~< cellA(i)@t ||
     cellA(i)@t' = cellA(i)@t).
 Proof.
-  induction t. smt ~steps:33222.
+  induction t. smt ~no_operators.
 Qed.
 
 lemma counterIncreaseB (t, t':timestamp, i:index):
@@ -137,7 +138,7 @@ lemma counterIncreaseB (t, t':timestamp, i:index):
   ( cellB(i)@t' ~< cellB(i)@t ||
     cellB(i)@t' = cellB(i)@t).
 Proof.
-  induction t. smt ~steps:61816.
+  induction t. smt ~no_operators.
 Qed.
 
 
@@ -149,7 +150,7 @@ lemma counterIncreaseStrictSA(i,j1:index, t:timestamp):
     (t < SenderA(i,j1) && exec@SenderA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@SenderA(i,j1).
 Proof.
-  use counterIncreaseA. smt ~steps:43032.
+  use counterIncreaseA. smt ~no_operators.
 Qed.
 
 lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
@@ -157,7 +158,7 @@ lemma counterIncreaseStrictRA (i,j1:index, t:timestamp):
     (t < ReceiverA(i,j1) && exec@ReceiverA(i,j1)) =>
       cellA(i)@t ~< cellA(i)@ReceiverA(i,j1).
 Proof.
-  use counterIncreaseA. smt ~steps:76165.
+  use counterIncreaseA. smt ~no_operators.
 Qed.
 
 (* The counter cellB(i) strictly increases between t and t'
@@ -168,7 +169,7 @@ lemma counterIncreaseStrictSB (i,j1:index, t:timestamp):
     (t < SenderB(i,j1) && exec@SenderB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@SenderB(i,j1).
 Proof.
-  use counterIncreaseB. smt ~steps:70778.
+  use counterIncreaseB. smt ~no_operators.
 Qed.
 
 lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
@@ -176,7 +177,7 @@ lemma counterIncreaseStrictRB (i,j1:index, t:timestamp):
     (t < ReceiverB(i,j1) && exec@ReceiverB(i,j1)) =>
       cellB(i)@t ~< cellB(i)@ReceiverB(i,j1).
 Proof.
-  use counterIncreaseB. smt ~steps:50058.
+  use counterIncreaseB. smt ~no_operators.
 Qed.
 
 (* SECURITY PROPERTIES *)
@@ -198,7 +199,7 @@ lemma authA (i,j:index) :
 Proof.
   intro Hap @/exec @/cond [Hexecpred [H1 H2 H3]].
   use counterIncreaseStrictRA.
-  euf H3; smt ~steps:25620.
+  euf H3; smt ~no_operators.
 Qed.
 
 
@@ -214,7 +215,7 @@ lemma authB(i,j:index) :
 Proof.
   intro Hap @/exec @/cond [Hexecpred [H1 H2 H3]].
   use counterIncreaseStrictRB.
-  euf H3; smt ~steps:28398.
+  euf H3; smt ~no_operators.
 Qed.
 
 
@@ -230,7 +231,7 @@ lemma injectivity(i,j,j':index) :
 Proof.
   use counterIncreaseStrictSB.
   use authA.
-  smt ~steps:110000.  
+  smt ~no_operators.  
 Qed.
 
 
@@ -248,7 +249,7 @@ Proof.
   use counterIncreaseStrictRA.
   use authA.
   use authB.
-  smt ~prover:CVC5 ~steps:230000.
+  smt ~no_operators.
 Qed.
 
 (* 2nd property w.r.t. B and B *)

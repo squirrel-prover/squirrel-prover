@@ -51,7 +51,7 @@ The 3 security properties as stated in [1].
 computational model’, 2014.*)
 
 set timeout=12.
-
+set smtSteps = 300000.
 (** Public constants (`abstract`) and names used in the protocol. *)
 abstract startplug  : message
 abstract endplug    : message
@@ -196,7 +196,7 @@ lemma counterIncreaseBis:
 lemma to prove the induction step. *)
 Proof.
   induction.
-  smt ~prover:CVC5 ~steps:25174. 
+  smt ~no_operators. 
 Qed.
 
 (** #### SECURITY PROPERTIES
@@ -235,7 +235,7 @@ lemma noreplayInv (ii, ii1, i:index):
 (** The proof relies on the previous helping lemmas reasoning on counter
 values. *)
 Proof.
- use counterIncreaseBis; smt ~prover:CVC5 ~steps:60000.
+ use counterIncreaseBis; smt ~no_operators.
 Qed.
 
 
@@ -244,7 +244,7 @@ lemma noreplay (ii, ii1, i:index):
     exec@S(ii1,i) && S(ii,i) <= S(ii1,i) && SCpt(i)@S(ii,i) = SCpt(i)@S(ii1,i) =>
       ii = ii1.
 Proof.
-  use noreplayInv; smt ~steps:15389.
+  use noreplayInv; smt ~no_operators.
 Qed.
 
 
@@ -289,7 +289,7 @@ Proof.
   (** It now remains to show that the counter value `cpt(i,j)@Press(i,j)` is
   not involved in another successful login, and this is done automatically 
   relying on counterIncreaseBis and the smt tactic *)
-  use counterIncreaseBis. smt ~prover:CVC5 ~steps:409616. 
+  use counterIncreaseBis. smt ~no_operators. 
 Qed.
 
 
@@ -307,6 +307,6 @@ lemma monotonicity (ii, ii1, i:index):
       && SCpt(i)@S(ii,i) ~< SCpt(i)@S(ii1,i) = orderOk =>
          S(ii,i) < S(ii1,i).
 Proof.
-use noreplayInv; smt ~prover:CVC5 ~steps:40000.
+use noreplayInv; smt ~no_operators.
 Qed.
 
