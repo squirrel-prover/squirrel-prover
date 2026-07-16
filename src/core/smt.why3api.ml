@@ -311,8 +311,9 @@ let context_init ~poly tm_theory evars sqenv table system =
 
 (* Adds a new type symbol to the symbol table and the theory
   the first time it is seen. *)
-let add_type context s =
-  let ts = Why3.Ty.create_tysymbol (id_fresh context s) [] NoDef in
+let add_type context s n =
+  let l = List.init n (fun i -> Why3.Ty.tv_of_string ("a"^(string_of_int i))) in
+  let ts = Why3.Ty.create_tysymbol (id_fresh context s) l NoDef in
   context.theory := Why3.Theory.add_ty_decl !(context.theory) ts;
   Hashtbl.add context.ty_tbl s ts;
   ts
@@ -340,11 +341,11 @@ let rec convert_type context = function
       assert (args=[]);
       Why3.Ty.ty_str
   | Type.TConstr ((ns,t),args) -> begin
-    if args <> [] then raise InternalError; (* FEAT: support type arguments *)
+    (*if args <> [] then raise InternalError;*) (* FEAT: support type arguments *)
     let s = Symbols.s_path_to_string (ns,t) in
     try
-      Why3.Ty.ty_app (Hashtbl.find context.ty_tbl s)  []
-    with Not_found -> Why3.Ty.(ty_app (add_type context s) [])
+      Why3.Ty.ty_app (Hashtbl.find context.ty_tbl s)  (List.map (convert_type context) args)
+    with Not_found -> Why3.Ty.(ty_app (add_type context s (List.length args)) (List.map (convert_type context) args))
     end
   | Type.TVar v -> if context.poly then
       try
@@ -1444,9 +1445,9 @@ let sq_id_fresh s = Ident.fresh (Ident.create s)
 (* Add the unfold of every macro. *)
 let add_macro_axioms context =
   Hashtbl.iter (fun _ (_,mn) ->
-    let str = path_to_string mn
+    let str = path_to_string mn 
     and def = Symbols.get_macro_data mn context.table in
-
+Format.printf "%s@." str;
     let ty_params, params_vars, rec_arg_var =
       match def with
       | General d -> begin
@@ -1474,8 +1475,8 @@ let add_macro_axioms context =
     in
 
     (* TODO: macro type variables: support polymorphism in macros *)
-    if ty_params <> [] then raise InternalError;
-    let m_symb = Macros.msymb context.table mn [] in
+    (*if ty_params <> [] then raise InternalError;*)
+    let m_symb = Macros.msymb context.table mn (List.map Type.tvar ty_params) in
 
     let params_terms = List.map Term.mk_var params_vars in
     let rec_arg = match rec_arg_var with
