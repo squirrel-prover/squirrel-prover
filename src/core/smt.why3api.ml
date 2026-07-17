@@ -309,20 +309,53 @@ let context_init ~poly tm_theory evars sqenv table system =
     poly = poly;
   }
 
+let rec get_vars ty = match ty with 
+  | Type.TVar tvar -> [tvar] 
+  | Type.TConstr (_,args) | Type.Tuple args -> List.concat_map get_vars args 
+  | Type.Fun (t1,t2) -> (get_vars t1) @ (get_vars t2)
+  | Type.TAlias (_,t,_) -> get_vars t
+  | _ -> []
+
 (* Adds a new type symbol to the symbol table and the theory
-  the first time it is seen. *)
-let add_type context s n =
-  let l = List.init n (fun i -> Why3.Ty.tv_of_string ("a"^(string_of_int i))) in
+  the first time it is seen. Algebraic data types 
+  are properly defined with their constructors. *)
+let rec add_type context ty s args_vars =
+  let l = List.map (Hashtbl.find context.tyvar_tbl) args_vars in 
   let ts = Why3.Ty.create_tysymbol (id_fresh context s) l NoDef in
-  context.theory := Why3.Theory.add_ty_decl !(context.theory) ts;
   Hashtbl.add context.ty_tbl s ts;
+  begin match HighType.constructors context.table ty with 
+  | None ->   context.theory := Why3.Theory.add_ty_decl !(context.theory) ts;
+  | Some (constr_symbs, _) -> begin 
+    let constr_nb = List.length constr_symbs in
+    let w_constr = List.map
+        (fun fname -> 
+            let data = Symbols.OpData.get_data fname context.table in
+            let ftype = data.ftype in
+            let str = path_to_string fname in
+            let w_symb =
+              Why3.Term.create_lsymbol ~constr:constr_nb
+                (id_fresh context str)
+                (List.map
+                  (convert_type context)
+                  ftype.fty_args)
+                (match ftype.fty_out with 
+                  | Type.Boolean -> None
+                  | _ -> Some (convert_type context ftype.fty_out))
+            in if not (Hashtbl.mem context.functions_tbl str) then
+              Hashtbl.add context.functions_tbl str (w_symb,l);
+          w_symb,(List.init (List.length ftype.fty_args) (fun _ -> None))
+        ) 
+        constr_symbs 
+    in context.theory:=Why3.Theory.add_data_decl !(context.theory) [(ts,(w_constr))]
+    end;
+  end;
   ts
 
 (* Type conversion from Squirrel to Why3.
  The internal error raised is notably used
  to know when to translate in an opaque way. *)
 
-let rec convert_type context = function
+and convert_type context ty = match ty with
   | Type.Message -> context.msg_ty
   | Type.Timestamp -> context.ts_ty
   | Type.Boolean -> Why3.Ty.ty_bool
@@ -341,11 +374,18 @@ let rec convert_type context = function
       assert (args=[]);
       Why3.Ty.ty_str
   | Type.TConstr ((ns,t),args) -> begin
-    (*if args <> [] then raise InternalError;*) (* FEAT: support type arguments *)
-    let s = Symbols.s_path_to_string (ns,t) in
+    let s = Symbols.s_path_to_string (ns,t) 
+    and args_vars = List.concat_map get_vars args in
     try
       Why3.Ty.ty_app (Hashtbl.find context.ty_tbl s)  (List.map (convert_type context) args)
-    with Not_found -> Why3.Ty.(ty_app (add_type context s (List.length args)) (List.map (convert_type context) args))
+    with Not_found -> begin
+        (*TODO, j'ai espoir que ça plante pas dans nos cas d'usage mais c'est douteux*)
+        assert (List.length args_vars = List.length args); 
+        Why3.Ty.(
+        ty_app 
+          (add_type context ty s args_vars)
+          (List.map (convert_type context) args))
+      end
     end
   | Type.TVar v -> if context.poly then
       try
@@ -948,23 +988,22 @@ let add_functions context =
                 ftype.fty_args)
               (convert_type context ftype.fty_out)
           in
-          Hashtbl.add
-            context.functions_tbl str
-            (symb, List.map (Hashtbl.find context.tyvar_tbl) ftype.fty_vars)
+          (* Some functions were already declared as algebraic data type constructors *)
+          if not (Hashtbl.mem context.functions_tbl str) then begin
+            Hashtbl.add
+              context.functions_tbl str
+              (symb, List.map (Hashtbl.find context.tyvar_tbl) ftype.fty_vars);
+            context.theory := 
+              Why3.Theory.add_decl_with_tuples 
+                !(context.theory) 
+                (Why3.Decl.create_param_decl symb);
+          end;
         with InternalError ->
           if smt_debug then
             Format.printf "Cannot declare %s : %a@." str Type.pp_ftype ftype
       end
     )
   context.table;
-  context.theory :=
-    Hashtbl.fold
-      (fun _ (symb,_) theory ->
-        Why3.Theory.add_decl_with_tuples 
-          theory
-          (Why3.Decl.create_param_decl symb)
-      )
-      context.functions_tbl !(context.theory);
   (* Some builtin functions are declared twice, this is not an issue
      as the new mapping will replace the previous one. *)
   List.iter
@@ -1447,7 +1486,6 @@ let add_macro_axioms context =
   Hashtbl.iter (fun _ (_,mn) ->
     let str = path_to_string mn 
     and def = Symbols.get_macro_data mn context.table in
-Format.printf "%s@." str;
     let ty_params, params_vars, rec_arg_var =
       match def with
       | General d -> begin
@@ -1899,7 +1937,7 @@ let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cm
       list_sequent
 
 (* Wrap [sequent_is_valid] in a fork to avoid memory leaks. *)
-let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
+(* let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
   ~hint_tables s
 =
   match Unix.fork () with
@@ -1909,16 +1947,19 @@ let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cm
         ~steps ~provers ~cmd_flag ~poly ~hint_tables s
     with
     | true -> exit 0
-    | _ | exception _ -> exit 1
+    | _ -> exit 1
+    | exception _ -> exit 2
     end
   | pid ->
     begin match Unix.waitpid [Unix.WUNTRACED] pid with
     | pid', WEXITED 0 when pid' = pid ->
       true
-    | _ ->
+    | pid', WEXITED 1 when pid'=pid -> 
       false
+    | _ ->
+      assert false
     end
-
+ *)
 type parameters = {
   timeout : int;
   steps : int option;
