@@ -160,6 +160,12 @@ let run_all_async ~timeout ~steps ~provers ~cmd_flag task =
   done;
   !res
 
+type action_data = {
+  action : Action.action_v;
+  name : Symbols.action;
+  indices : Vars.vars
+}
+
 (** Context for SMT translation, providing information on:
     - the Squirrel formulas being translated (e.g. table, system expression);
     - the SMT formulas (declared symbols and variables);
@@ -167,7 +173,7 @@ let run_all_async ~timeout ~steps ~provers ~cmd_flag task =
 type context = {
   env : Env.t;
   table : Symbols.table;
-  system : SystemExpr.fset option;
+  actions : action_data list;
 
   real_export : Why3.Theory.namespace;
   int_export : Why3.Theory.namespace;
@@ -224,7 +230,8 @@ let id_fresh context name =
 
 exception InternalError
 
-let context_init ~poly tm_theory evars sqenv table system =
+let context_init ~poly tm_theory evars sqenv =
+  let table = sqenv.Env.table in
   let int_theory, real_theory, from_int_theory =
     try
       let int_theory = 
@@ -266,7 +273,16 @@ let context_init ~poly tm_theory evars sqenv table system =
   {
     env = sqenv;
     table = table;
-    system = system;
+    actions =
+      begin match
+        SystemExpr.get_compatible_of_context table sqenv.se_vars sqenv.system
+      with
+      | None -> [] (* this happens only when context = any *)
+      | Some system ->
+        List.map
+          (fun (action,name,indices) -> {action;name;indices})
+          (SystemExpr.actions table system)
+      end;
 
     int_export = int_export;
     real_export = real_export;
@@ -895,22 +911,23 @@ let sqterm_to_wfmla context fmla =
 
 (* Fill symbol tables. *)
 let add_actions context =
-  if context.system <> None then (
-    SystemExpr.iter_descrs context.table (Option.get context.system)
-      (fun descr ->
-          if descr.name <> Symbols.init_action then
-            let str = path_to_string descr.name in
-            let symb_act = Why3.Term.create_fsymbol
-                (id_fresh context str)
-                (List.init
-                    (List.length descr.indices)
-                    (fun _ -> context.index_ty))
-                context.ts_ty
-            in
-            Hashtbl.add
-              context.actions_tbl
-              str
-              (symb_act,List.length descr.indices)));
+  List.iter
+    (fun descr ->
+       if descr.name <> Symbols.init_action then
+         let str = path_to_string descr.name in
+         let symb_act =
+           Why3.Term.create_fsymbol
+             (id_fresh context str)
+             (List.init
+                (List.length descr.indices)
+                (fun _ -> context.index_ty))
+             context.ts_ty
+         in
+         Hashtbl.add
+           context.actions_tbl
+           str
+           (symb_act,List.length descr.indices))
+    context.actions;
   context.theory :=
     Hashtbl.fold
       (fun _ (symb,_) theory ->
@@ -1266,8 +1283,8 @@ let add_timestamp_axioms context =
   (* Add axioms for action dependencies to above mutable list. *)
   (* "mk_depends_lemma" function from lemma.ml. *)
   let depends =
-    SystemExpr.fold_descrs
-      (fun descr1 acc -> SystemExpr.fold_descrs (fun descr2 acc' ->
+    List.fold_left (fun acc descr1 ->
+      List.fold_left (fun acc' descr2 ->
             if descr1.name <> Symbols.init_action &&
                Action.depends
                  (Action.get_shape_v descr1.action)
@@ -1290,16 +1307,15 @@ let add_timestamp_axioms context =
               in
               (sqterm_to_wfmla context axiom)::acc'
             end
-            else acc'
-          ) context.table (Option.get context.system) acc
-      )
-      context.table (Option.get context.system) []
+            else acc')
+        acc context.actions)
+      [] context.actions
   in
   (* Add axioms for action exclusion to above mutable list. *)
   (* "mk_mutex_lemma" function from lemma.ml. *)
   let mutex =
-    SystemExpr.fold_descrs
-      (fun descr1 acc -> SystemExpr.fold_descrs (fun descr2 acc' ->
+    List.fold_left (fun acc descr1 ->
+     List.fold_left (fun acc' descr2 ->
             let shape1 = Action.get_shape_v  descr1.action in
             let shape2 = Action.get_shape_v descr2.action in
             if descr1.name < descr2.name && (Action.mutex shape1 shape2)
@@ -1325,9 +1341,9 @@ let add_timestamp_axioms context =
               (sqterm_to_wfmla context axiom)::acc'
             end
             else acc'
-          ) context.table (Option.get context.system) acc
+          ) acc context.actions
       )
-      context.table (Option.get context.system) []
+      [] context.actions
 
   in
     List.iter (fun (id_ax,ax) ->
@@ -1537,7 +1553,8 @@ let add_macro_axioms context =
                     body.Macros.vars
                     (Term.mk_impl
                        (Term.mk_and
-                          (Term.mk_eq
+                          (if rec_arg = Term.mk_unit then Term.mk_true else
+                            Term.mk_eq
                              rec_arg
                              (oget_dflt rec_arg body.Macros.pattern))
                           body.Macros.when_cond)
@@ -1692,9 +1709,10 @@ let local_stmt_valid_in_any_system (hint : Hint.smt_hint) =
 
 (* Add the hint to the theory if it is compatible with the system.
   A substitution is applied if needed. *)
-let add_hint ~(exact:bool) context system (hint:Hint.smt_hint) =
+let add_hint ~(exact:bool) context (hint:Hint.smt_hint) =
   if hint.formula.bound = None && exact then () else
     begin
+      let system = context.env.system.set in
       let hint_system = hint.system.set
       and name = hint.name in
       if SE.subset_modulo context.table system hint_system then begin
@@ -1747,16 +1765,10 @@ let add_operator_definition context =
 
 let build_task
     ~macro_axioms ~operator_axioms ~poly ~exact ~hint_tables
-    (env : Env.t) (table : Symbols.table) (system : SE.t)
+    (env : Env.t)
     evars hypotheses hints conclusion tm_theory
   =
-  let system_fset = match SystemExpr.to_fset system with
-    | exception SystemExpr.(Error (_,Expected_fset)) -> None
-    | fsys -> Some fsys
-  in
-  let context =
-    context_init ~poly tm_theory evars env table system_fset
-  in
+  let context = context_init ~poly tm_theory evars env in
   add_actions context;
   add_functions context;
   add_macros context;
@@ -1766,13 +1778,13 @@ let build_task
   List.iter
     (fun hint_table -> 
       List.iter
-        (fun hint -> add_hint ~exact context system hint)
+        (fun hint -> add_hint ~exact context hint)
         (Utils.oget_dflt [] (Utils.Ms.find_opt hint_table hints))
     ) hint_tables;
   
   if macro_axioms then add_macro_axioms context;
 
-  if system_fset<>None then add_timestamp_axioms context;
+  add_timestamp_axioms context;
 
   (* only add injectivity of names for the asymptotic logic *)
   if not exact then add_name_axioms context;
@@ -1829,7 +1841,7 @@ let is_valid
     ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag
     ~(poly : bool) ~(exact : bool) (* [poly] refers to polymorphism *)
     ~hint_tables
-    sqenv table system evars hypotheses hints conclusion
+    sqenv evars hypotheses hints conclusion
   =
   if disable_smt then
     (Format.eprintf "SMT support disabled in JS.@.";
@@ -1843,7 +1855,7 @@ let is_valid
     build_task
       ~poly ~exact
       ~macro_axioms ~operator_axioms ~hint_tables
-      sqenv table system
+      sqenv
       evars hypotheses hints conclusion
       theory
   in
@@ -1916,7 +1928,7 @@ let sequent_is_valid ~macro_axioms ~operator_axioms
   let conclusion = LowTraceSequent.conclusion s in
   is_valid ~macro_axioms ~operator_axioms ~poly ~exact ~hint_tables
     ~timeout ~steps ~provers ~cmd_flag
-    env table system evars hypotheses hints conclusion
+    env evars hypotheses hints conclusion
 
 (* Wrap [sequent_is_valid] to handle diff operators
    by calling previous [sequent_is_valid] on each projection of the goal. *)

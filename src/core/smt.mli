@@ -15,8 +15,6 @@ val is_valid :
   exact:bool ->
   hint_tables:string list ->
   Env.t -> 
-  Symbols.table ->
-  < > SystemExprSyntax.expr ->
   Vars.var list ->
   Term.term list ->
   (Hint.smt_hint list) Utils.Ms.t ->

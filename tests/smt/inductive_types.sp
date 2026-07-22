@@ -75,7 +75,11 @@ hint smt length_append_rev.
 
 lemma length_rev @system:any ['a] (l : list 'a) :
   length (rev l) = length l.
-Proof. smt. Qed.
+Proof.
+  (* TODO direct proof *)
+  assert rev l = append_rev Nil l by smt.
+  smt.
+Qed.
 
 lemma rev_sanity @system:any ['a] (l: list 'a) :
   rev l = l.

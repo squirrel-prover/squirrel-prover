@@ -39,7 +39,7 @@ abstract f : index -> message.
 lemma [any] _ :
   (try find i j such that f i = empty in <f i, f j>) =
   (try find i j such that f i = empty in <empty, f j>).
-Proof. smt ~prover:Z3_noBV ~no_macros. Qed.
+Proof. smt ~prover:Z3 ~no_macros. Qed.
 
 lemma [any] introTryFind :
   forall x:message, forall m:index -> index -> message, 
@@ -56,7 +56,4 @@ lemma[any] _ : (not (g true || g false) => h) => (try find x such that (g x) in 
 
 lemma[any] _ : (not (g true || g false) => h) => 
   (try find x y z such that (g x) && y && z in (g x) else h).
- Proof. smt  ~no_macros ~no_operators. Qed.
-
-
-
+ Proof. smt ~prover:CVC5 ~no_macros ~no_operators. Qed.

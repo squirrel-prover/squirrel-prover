@@ -3,7 +3,7 @@
 include Core.
 
 set timeout = 10.
-set smtSteps=10000.
+set smtSteps = 20000.
 
 (* A type seed, for any ponctual randomness (in signature and encryption *)
 type seed[large, serializable].
@@ -100,5 +100,4 @@ crypto CCA2 => //.
 + smt.
 + smt.
 + smt.
-Qed.    
-
+Qed.

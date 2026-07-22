@@ -52,6 +52,5 @@ Qed.
 lemma reach (tau:timestamp): input@tau <> h(cpt@tau,k).
 Proof.
 intro Eq; euf Eq. 
-use counterIncrease; smt ~steps:12641.
+use counterIncrease; smt ~steps:20000.
 Qed.
-
