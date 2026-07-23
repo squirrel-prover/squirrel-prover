@@ -121,7 +121,7 @@ let s_smt_classic_macros = "smtClassicMacros"
 let v_smt_classic_macros = Param_bool true
 
 let s_smt_quantum_macros = "smtQuantumMacros"
-let v_smt_quantum_macros = Param_bool false
+let v_smt_quantum_macros = Param_bool true
 
 
 let s_smt_steps = "smtSteps"

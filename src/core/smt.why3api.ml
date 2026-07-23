@@ -1949,7 +1949,7 @@ let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cm
       list_sequent
 
 (* Wrap [sequent_is_valid] in a fork to avoid memory leaks. *)
-(* let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
+let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
   ~hint_tables s
 =
   match Unix.fork () with
@@ -1971,7 +1971,7 @@ let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cm
     | _ ->
       assert false
     end
- *)
+
 type parameters = {
   timeout : int;
   steps : int option;
