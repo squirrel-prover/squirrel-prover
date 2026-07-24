@@ -1,6 +1,6 @@
 channel c
 abstract ok: message.
-set smtSteps = 10000.
+set smtSteps = 100000.
 
 
 include Core.

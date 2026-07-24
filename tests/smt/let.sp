@@ -1,4 +1,4 @@
-set smtSteps=10000.
+set smtSteps=100000.
 
 lemma[any] _ : let x = true in x.
 Proof. smt. Qed. 

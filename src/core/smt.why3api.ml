@@ -195,6 +195,7 @@ type context = {
   init_symb : Why3.Term.lsymbol;
   pred_symb : Why3.Term.lsymbol;
   macro_cond_symb : Why3.Term.lsymbol;
+  seq_symb : Why3.Term.lsymbol;
   choose_symbs : (int, Why3.Term.lsymbol list) Hashtbl.t;
   msg_ty : Why3.Ty.ty;
   ts_ty : Why3.Ty.ty;
@@ -304,6 +305,7 @@ let context_init ~poly tm_theory evars sqenv =
     init_symb    = Why3.Theory.ns_find_ls tm_export ["init"];
     pred_symb    = Why3.Theory.ns_find_ls tm_export ["pred"];
     macro_cond_symb  = Why3.Theory.ns_find_ls tm_export ["macro_cond"];
+    seq_symb = Why3.Theory.ns_find_ls tm_export ["seq"];
     choose_symbs = choose_tbl;
     msg_ty   = Why3.Ty.ty_app msg_symb [];
     ts_ty    = Why3.Ty.ty_app ts_symb [];
@@ -799,7 +801,11 @@ and sqterm_to_wfmla context : Term.term -> Why3.Term.term = fun fmla ->
       sqterm_to_wfmla_q context t_forall_close vs f fmla
     | Term.Quant (Exists, vs, f) ->
       sqterm_to_wfmla_q context t_exists_close vs f fmla
-    | Term.Quant (Seq,vs,f) | Term.Quant (Lambda,vs,f) ->
+    | Term.Quant (Seq,vs,f) ->
+      Why3.Term.t_app_infer 
+        context.seq_symb 
+        [sqterm_to_wfmla_q context t_lambda vs f fmla]
+    | Term.Quant (Lambda,vs,f) ->
       sqterm_to_wfmla_q context t_lambda vs f fmla
     | Action (a,indices) ->
       t_app_infer (fst(Hashtbl.find context.actions_tbl (path_to_string a)))

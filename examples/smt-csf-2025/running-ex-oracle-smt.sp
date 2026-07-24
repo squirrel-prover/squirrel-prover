@@ -110,7 +110,7 @@ lemma lastupdate_init : forall (i:index,tau:timestamp), happens(tau) => (
 Proof.
   intro i.
   induction.
-  smt ~steps:16514. 
+  smt ~steps:30000. 
 Qed.
 
 
@@ -122,7 +122,7 @@ lemma lastupdate_A: forall (i:index, j:index, tau:timestamp),
 Proof.
   intro i j.
   induction.
-  smt ~steps:39686. 
+  smt ~steps:40000. 
 Qed.
 
 

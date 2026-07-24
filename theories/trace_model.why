@@ -62,4 +62,6 @@ theory Trace_model
   axiom choose_def : forall phi:'a -> bool.
     if (exists x:'a. phi x) then (phi (choose phi)) else true
 
+  function seq 'a : message
+
 end

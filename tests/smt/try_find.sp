@@ -26,6 +26,7 @@ lemma [any] _ (i0:index) :
   (try find i j k l such that i = i0 && i = j && j = k && k = l in input@tau(i,l)) = input@tau(i0,i0).
 Proof. smt ~prover:CVC5. Qed.
 
+
 lemma [any] _ (i0:index) :
   (try find i j k l such that i = i0 && i = j &&  k = l in input@tau(i,l)) = input@tau(i0,i0).
 Proof. checkfail (smt ~steps:10000) exn Failure. Abort.

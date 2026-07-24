@@ -1,4 +1,4 @@
-set smtSteps=30000.
+set smtSteps=300000.
 
 lemma [any] implies_exists2 ['a] (phi:bool,psi:'a->bool) :
   (phi => exists j:'a, psi(j)) =

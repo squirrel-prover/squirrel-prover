@@ -46,11 +46,11 @@ system ((!_i A)).
 lemma counterIncrease (t,t':timestamp):
    t' < t => cpt@t' ~< cpt@t.
 Proof.
-induction t. smt ~steps:14943.
+induction t. smt ~steps:30000.
 Qed.
 
 lemma reach (tau:timestamp): input@tau <> h(cpt@tau,k).
 Proof.
 intro Eq; euf Eq. 
-use counterIncrease; smt ~steps:20000.
+use counterIncrease; smt ~steps:30000.
 Qed.

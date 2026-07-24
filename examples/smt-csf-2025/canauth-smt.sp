@@ -21,7 +21,7 @@ SECURITY PROPERTIES
 - authentication
 - injectivity
 *******************************************************************************)
-set smtSteps = 300000.
+set smtSteps = 400000.
 
 hash hmac
 

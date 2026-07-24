@@ -108,7 +108,7 @@ lemma auth_R1 (jj,ii:index):
 Proof.
   intro Hap @/cond Hcond.
   euf Hcond.
-  smt ~steps:16110.  
+  smt ~steps:30000.  
 Qed.
 
 lemma auth_T1 (i,j:index):
@@ -119,5 +119,5 @@ lemma auth_T1 (i,j:index):
 Proof.
   intro Hap @/cond Hcond.
   euf Hcond.
-  smt ~steps:26823.
+  smt ~steps:30000.
 Qed.

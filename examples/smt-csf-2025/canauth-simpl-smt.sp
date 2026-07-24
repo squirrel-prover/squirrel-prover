@@ -20,7 +20,7 @@ HELPING LEMMAS
 SECURITY PROPERTIES
 - authentication on one side 
 *******************************************************************************)
-set smtSteps = 100000.
+set smtSteps = 200000.
 
 hash hmac
 

@@ -30,6 +30,7 @@ HELPING LEMMAS
 SECURITY PROPERTIES
 - authentication
 *******************************************************************************)
+set smtSteps = 400000.
 
 hash H
 hash G
@@ -78,7 +79,7 @@ lemma lastupdateTag (i:index,tau:timestamp):
         forall j', happens(T(i,j')) && T(i,j')<=tau => T(i,j')<=T(i,j))).
 Proof.
   induction tau.
-  smt ~steps:132918.
+  smt.
 Qed.
 
 lemma lastupdateReader (ii:index,tau:timestamp):
@@ -91,7 +92,7 @@ lemma lastupdateReader (ii:index,tau:timestamp):
           happens(R(jj',ii)) && R(jj',ii)<=tau => R(jj',ii)<=R(jj,ii))).
 Proof.
 induction tau.
-smt ~steps:41000.
+smt.
 Qed.
 
 (* The following lemma states that values of different memory cells do not
@@ -115,7 +116,7 @@ Proof.
   + rewrite Meq B /sT in A0.
     expand sR(i')@R(j',i').
     collision A0 => H.
-    smt ~steps:42059. 
+    smt. 
 Qed.
 
 (* SECURITY PROPERTIES *)

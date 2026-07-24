@@ -1,5 +1,5 @@
 include Logic.
-set smtSteps=10000.
+set smtSteps=100000.
 
 set verboseCrypto = true.
 
