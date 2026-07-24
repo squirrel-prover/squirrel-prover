@@ -746,11 +746,12 @@ and sqterm_to_wfmla context : Term.term -> Why3.Term.term = fun fmla ->
           t_app_infer
             (context.real_gt_symb)
             [sqterm_to_wfmla context t1;sqterm_to_wfmla context t2]
-
-        | [cond;f1;f2] when symb=f_ite ->
-          t_if (sqterm_to_wfmla context cond)
-            (sqterm_to_wfmla context f1)
-            (sqterm_to_wfmla context f2)
+        | cond::f1::f2::args when symb=f_ite ->
+          Why3.Term.t_func_app_beta_l
+            (t_if (sqterm_to_wfmla context cond)
+              (sqterm_to_wfmla context f1)
+              (sqterm_to_wfmla context f2))
+            (sqfmlas_to_wterms context args)
         | _ when
             (Symbols.OpData.get_data symb context.table).ftype.fty_vars <> []
             && not context.poly
