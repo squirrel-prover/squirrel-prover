@@ -1060,7 +1060,7 @@ Proof.
     rewrite -P GR if_true /=; 1: auto.
     rewrite GI.
     rewrite /RKRreceive /RKIsend Sync3.
-    rewrite -(same_RKRsend0 (R(p#1)) (pred (R(ind_succ (p#1))))); 1,2: smt ~steps:130000.
+    rewrite -(same_RKRsend0 (R(p#1)) (pred (R(ind_succ (p#1))))); 1,2: smt ~no_macros ~steps:130000.
     have IH0 := IH (p#1, false) _ _ _ _; [1,2,3: smt | 4: by rewrite pair_order].
     have STR : stR (p#1, false) = RKRsend@R(p#1); 1: smt.
     have STI : stI (p#1, false) = RKIreceive@I(p#1); 1: smt.

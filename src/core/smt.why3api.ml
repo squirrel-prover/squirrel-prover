@@ -1956,27 +1956,27 @@ let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cm
       list_sequent
 
 (* Wrap [sequent_is_valid] in a fork to avoid memory leaks. *)
-let sequent_is_valid ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
+let sequent_is_valid
+  ~macro_axioms ~operator_axioms ~timeout ~steps ~provers ~cmd_flag ~poly
   ~hint_tables s
 =
+  let call () =
+    sequent_is_valid ~macro_axioms ~operator_axioms ~timeout
+      ~steps ~provers ~cmd_flag ~poly ~hint_tables s
+  in
+  if smt_debug then call () else
   match Unix.fork () with
   | 0 ->
-    begin match
-      sequent_is_valid ~macro_axioms ~operator_axioms ~timeout
-        ~steps ~provers ~cmd_flag ~poly ~hint_tables s
-    with
+    begin match Printexc.print call () with
     | true -> exit 0
     | _ -> exit 1
     | exception _ -> exit 2
     end
   | pid ->
     begin match Unix.waitpid [Unix.WUNTRACED] pid with
-    | pid', WEXITED 0 when pid' = pid ->
-      true
-    | pid', WEXITED 1 when pid'=pid -> 
-      false
-    | _ ->
-      assert false
+    | pid', WEXITED 0 when pid' = pid -> true
+    | pid', WEXITED 1 when pid' = pid -> false
+    | _ -> Tactics.(hard_failure (Failure "exception occurred in fork"))
     end
 
 type parameters = {

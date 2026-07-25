@@ -11,13 +11,13 @@ lemma[any] _ (x:message): (a x) = (a x). Proof. smt. Qed.
 
 lemma[any] _ : forall f:bool->bool, f true || not (f true). Proof. smt. Qed.
 
-lemma[any] _ : exists f:bool->bool, f(true)=true. Proof. smt ~prover:Z3_counterexamples. Qed. 
+lemma[any] _ : exists f:bool->bool, f(true)=true. Proof. smt ~prover:Z3_counterexamples. Qed.
 
-abstract ok : message. 
+abstract ok : message.
 
-lemma[any] _ : exists f:message->bool, f(empty)=true. Proof. smt ~prover:Z3_counterexamples. Qed. 
+lemma[any] _ : exists f:message->bool, f(empty)=true. Proof. smt ~prover:Z3_counterexamples. Qed.
 
-lemma[any] _ : exists f:message->bool, f(ok)=true. Proof. smt ~prover:Z3. Qed. 
+lemma[any] _ : exists f:message->bool, f(ok)=true. Proof. smt ~prover:Z3 ~no_macros. Qed.
 
 lemma[any] _ : forall x:bool, forall y:bool, h(x)(y) || not( h(x)(y)).
 Proof. smt. Qed.
