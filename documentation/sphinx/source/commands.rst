@@ -65,9 +65,22 @@ Commands
    showStrengthenedHyp    Show hypothesis after strengthening          false
    autoFADup              Automatic FA Dup                             true
    newInduction           New equivalence induction principle (FIXME)  false
-   postQuantumSound       Post-quantum soundness                       false
+   postQuantumEquivs      Post-quantum soundness                       false
    checkInclude           Include will check proofs                    true
    ====================== ============================================ ======================
+
+   .. note::
+
+      Post-quantum soundness has two parts. The ``postQuantumEquivs`` option
+      above enables the extra checks; in addition, systems to be analysed
+      against a quantum attacker are declared with the ``[postquantum]``
+      annotation::
+
+        system [postquantum] mysystem = (A: P | B: Q).
+
+      Both are needed together. The case studies in ``examples/pq-ccs-2026/``
+      open with ``close Classic.  open Quantum.  set postQuantumEquivs =
+      true.`` and declare every system ``[postquantum]``.
 
 .. cmd:: print {? @ident}
 
