@@ -389,7 +389,7 @@ Here is the list of all objects of the Squirrel domain (The symbol |black_nib| i
 
       .. code-block:: rst
 
-       .. flag:: postQuantumSound
+       .. flag:: postQuantumEquivs
 
           Perform extra checks to ensure that results
           are sound wrt a quantum adversary.
@@ -876,7 +876,7 @@ In addition to the objects and directives above, the ``squirrelrst`` Sphinx plug
 
              Apply tactics :g:`apply not_true; reflexivity` 
              or set options 
-             :g:`set postQuantumSound=true.`
+             :g:`set postQuantumEquivs=true.`
              or declare 
              :g:`(forall (a:'a), true) = true.`
 
@@ -884,7 +884,7 @@ In addition to the objects and directives above, the ``squirrelrst`` Sphinx plug
 
              Apply tactics :g:`apply not_true; reflexivity` 
              or set options 
-             :g:`set postQuantumSound=true.`
+             :g:`set postQuantumEquivs=true.`
              or declare 
              :g:`(forall (a:'a), true) = true.`
 
