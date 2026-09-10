@@ -72,7 +72,7 @@ For a more theoretical perspective on Squirrel,
 you may read some of the associated publications:
 :cite:`bdjkm21sp` for the original paper,
 :cite:`bdkm22csf` for the extension to stateful protocols,
-:cite:`cfj22sp` for the extension to post-quantum attackers and
+:cite:`ho-pq-squirrel-to-appear` for the latest extension to post-quantum attackers and
 :cite:`bkl23lics` for the up to date presentation of the logic.
 
 .. note::

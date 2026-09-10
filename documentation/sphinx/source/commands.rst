@@ -69,18 +69,31 @@ Commands
    checkInclude           Include will check proofs                    true
    ====================== ============================================ ======================
 
-   .. note::
+   .. note:: 
 
-      Post-quantum soundness has two parts. The ``postQuantumEquivs`` option
-      above enables the extra checks; in addition, systems to be analysed
-      against a quantum attacker are declared with the ``[postquantum]``
-      annotation::
+      Post-quantum soundness has two parts. First, the
+      ``postQuantumEquivs`` option above enables the post-quantum
+      attacker for `equiv` predicates. In addition, system macros now
+      have two variants: the classial variants, declared by default
+      when creating a system, live in the name-space `Classic`, open
+      by default (so, `frame` in fact refer to `Classical.frame`.
+      
+      Systems to be analysed against a quantum attacker are declared
+      with the ``[postquantum]`` annotation::
 
         system [postquantum] mysystem = (A: P | B: Q).
 
-      Both are needed together. The case studies in ``examples/pq-ccs-2026/``
+      This declares the post-quantum variants of the macros, which
+      live inside the `Quantum` namespace, with e.g. `Quantum.frame`.
+      
+      The case studies in ``examples/pq-ccs-2026/``
       open with ``close Classic.  open Quantum.  set postQuantumEquivs =
       true.`` and declare every system ``[postquantum]``.
+
+      We refer to :cite:`ho-pq-squirrel-to-appear` for the theoretical
+      foundations of the post-quantum setting.
+      
+      
 
 .. cmd:: print {? @ident}
 
