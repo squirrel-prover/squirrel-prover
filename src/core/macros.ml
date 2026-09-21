@@ -1041,11 +1041,26 @@ let get_def_glob
     | Action (_, i) -> i
     | _ -> assert false
   in
+  (* Here, the actual action might have more indices than the let
+     binding, this is e.g. the case when we do the following
+     declaration:
+     
+     ```
+     in(c,x);
+     let t = ... in
+     try find i such that ...
+     ```
+     
+     where `t` does not depend on any index, but the action does.
+  *)
+  let rec _drop n l = if n=0 then l else _drop (n-1) (List.tl l) in
+
+  let act_idx = _drop (List.length idx - List.length data.indices) idx in
   let idx_subst =
     List.map2
       (fun i t -> Term.ESubst (Term.mk_var i, t))
       data.indices
-      idx
+      act_idx
   in
 
     
@@ -1053,8 +1068,7 @@ let get_def_glob
   (* Compute the relevant part of the action, i.e. the
      prefix of length [length inputs], reversed. *)
   let rev_action =
-    let rec drop n l = if n=0 then l else drop (n-1) (List.tl l) in
-    drop (List.length action - List.length data.inputs) (List.rev action)
+    _drop (List.length action - List.length data.inputs) (List.rev action)
   in
 
   let input_macro =

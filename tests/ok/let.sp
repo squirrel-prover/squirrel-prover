@@ -6,14 +6,17 @@ channel c
 abstract ok : message
 abstract ko : message
 
-system S:
-  !_i in(c,x);
+process test(repl:index) =
+      in(c,x);
       let def = <x,x> in
       out(c,x);
       try find j such that def=def in
-        out(c,ok)
+        out(c,def)
       else
-        out(c,ko).
+        out(c,ko). 
+
+system S:
+  !_i test(i).
 
 lemma def_S : 
   forall (i:index),
@@ -57,3 +60,24 @@ Proof.
  intro Hap.
  checkfail rewrite /def exn Failure.
 Abort.
+
+
+
+process test2(repl:index) =
+      in(c,x);
+      let ndef = <x,x> in
+      (* out(c,x); *)
+      try find j such that ndef=ndef in
+        out(c,ndef)
+      else
+        out(c,ko). 
+
+system Sf= T:
+  !_i test2(i).
+
+lemma [Sf] _ : 
+  forall (i,j:index),
+  happens(T(i,j)) => ndef@T(i,j) = <input@T(i,j),input@T(i,j)>.
+Proof.
+  auto.
+Qed.
