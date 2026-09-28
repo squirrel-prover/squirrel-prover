@@ -47,6 +47,7 @@ module PRFs = {
     while (i < n){
      k <$ dkey;
      ks <- k :: ks;
+     i <- i+1;
     } 
   }
   
