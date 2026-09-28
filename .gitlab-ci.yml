@@ -3,7 +3,7 @@ image: python3.7-alpine
 # some default values
 variables:
   OPAM_SWITCH: "gitrunner_$CI_COMMIT_SHA"
-  OCAML_VERSION: "ocaml-base-compiler.5.0.0"
+  OCAML_VERSION: "ocaml-base-compiler.5.1.1"
   
 prerequis:
   stage: .pre
