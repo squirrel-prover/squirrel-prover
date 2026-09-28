@@ -204,7 +204,7 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 # Only executes tests if dependencies have changed (?)
 # relying on dune file to know (possibly runtime) dependencies.
 alcotest: version
-	dune runtest
+	timeout -v 2h dune runtest
 
 # Same as above but will print out only the FAILs tests as before
 alcotest_full: version 
