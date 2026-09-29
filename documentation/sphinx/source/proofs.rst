@@ -1277,20 +1277,53 @@ Local tactics
 .. tact:: smt {? ~prover} {* ~option} {? ~timeout:@natural}
    :name: smt
     
-    Try to discharge the current goal using an SMT solver. 
+    Try to discharge the current goal using SMT solvers.
+    When multiple provers are used, the tactic returns as soon as
+    one prover declares the translated goal as being valid.
 
-    The prover called can be chosen using the flag `~prover`, supported provers include 
-    CVC5 (`CVC5`), Z3 (`Z3`) and Alt-Ergo (`AltErgo`). 
-    The alternative counterexamples can be used by adding (`_counterexamples`) 
-    after the name of the prover. The same goes with alternatives (`_BV`) for 
-    Alt-Ergo and (`_noBV`) for Z3. 
+    The provers to be used are specified using the :g:`~provers` flag,
+    or equivalently :g:`~prover`.
+    Possible prover names include `CVC5`, `Z3`, `AltErgo`,
+    and any Why3 prover name without special symbols.
+    Prover alternatives can be specified, separated by an underscore,
+    e.g. as in `Z3_noBV`. See your Why3 config file or the output of
+    `why3 config detect` for your list of available provers and
+    alternatives.
 
-    The timeout can be set using `~timeout:n` (`n` is in seconds, default to 1).
+    By default only `CVC5` is used.
+    The prover options take a single prover name or a list of names
+    as argument,
+    e.g. :g:`prover:Z3` or :g:`~provers:[Z3,CVC5]`.
+    Using :g:`~provers:All` or :g:`~prover:All`
+    selects all available provers.
 
-    Additional options can be provided:
+    The timeout can be set using
+    :g:`~timeout:n` (:g:`n` is in seconds, default to 1)
+    or :g:`~steps:n` (:g:`n` is an integer, a prover-specific number of steps,
+    defaults to the configuration parameter :g:`smtSteps`).
+
+    Additional options can be used to control the translation to a SMT goal,
+    which can result in faster results:
     
-    * `~no_macros` disable the translation of :ref:`macro<section-system-macros>` definitions;
-    * `~no_operators` disable translation of :ref:`operator<section-operators>` definitions.
+    * :g:`~no_macros` disables the translation of :ref:`macro<section-system-macros>` definitions;
+    * :g:`~no_operators` disables the translation of :ref:`operator<section-operators>` definitions.
+
+    The tactic also relies on the configuration parameters
+    :g:`smtClassicMacros` and :g:`smtQuantumMacros` (both defaulting to true)
+    to control whether the definitions of generic classic or quantum macro
+    should be translated. These are additional filters on top of
+    :g:`~no_macros`.
+
+    Option :g:`~no_poly`
+    disables the translation of polymorphic function symbols.
+    It should not be useful to a regular user, but is present mainly for 
+    historical and benchmarking purposes.
+
+    Finally, debug information will be printed by the tactic
+    if the environment variable `SMT_DEBUG` is set.
+    In normal mode, the tactic runs Why3 behind a fork to avoid accumulating
+    memory usage, but this is disabled for easier debugging when
+    `SMT_DEBUG` is set.
     
     
 Global tactics
