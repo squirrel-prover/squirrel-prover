@@ -479,6 +479,25 @@ let f @system:P (x : int) u with
 "
   in
 
+  (*------------------------------------------------------------------*)  
+  let () =
+    let st = 
+      Prover.exec_all ~test:true init "system P = null."
+    in
+
+    (* c.f. issue #358 or comment in
+       [fun_decl_parse_system_annotation] in [processDecl.ml] *)
+    Alcotest.check_raises "let def: single systems are distinct" Ok
+      (fun () ->
+         ignore (
+           try
+             Prover.exec_all ~test:true st "\
+let c @system:(P/left, P/left) = diff(true,false)."
+           with
+             ProcessDecl.Error (_,_,Failure _) -> raise Ok)
+      );
+  in
+
   ()
 
 

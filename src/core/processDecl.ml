@@ -1000,6 +1000,81 @@ let[@warning "-23"]
   List.fold_left doit { admit_adv = false; opaque = false; } annots
 
 (*------------------------------------------------------------------*)
+(** parse a system annotation for a function declaration *)
+let fun_decl_parse_system_annotation
+    table (op_in_system : Decl.op_in_system)
+  : (SE.Var.t * SE.Var.info list) list * SE.t option * Macros.in_systems
+  =
+  match op_in_system with 
+  | `Any -> [], None, Macros.Any
+
+  | `Like p ->
+    let p = Symbols.System.convert_path p table in
+    let v = SE.Var.of_ident (Ident.create "'S") in
+    ( [v, [SE.Var.Compatible_with p]], 
+      Some (SE.var v), 
+      Macros.Like p )
+
+  | `Systems s ->
+    let vars, system = SE.Parse.parse ~implicit:false ~se_env:[] table s in
+    assert (vars = []);
+
+    let () =
+      let l = L.loc s in
+      let proj_single_list = odflt [] (SE.to_list_any system) in
+
+      (* check that labels of [system]'s are unique *)
+      let proj_list = List.map fst proj_single_list in
+      let sorted_p = List.sort_uniq Stdlib.compare proj_list in
+      if List.length sorted_p <> List.length proj_list then
+        error l KDecl (Failure "the multi-system labels must be distincts");
+
+      (* Check that the single systems in [system]'s are unique.
+
+         Reason (mostly copy-pasted from #358).
+
+         Without this, Squirrel behaves strangely when a top-level
+         `let` binding has been defined on a multi-system in which
+         the same single system appears several times. In that
+         scenario, the semantics of the `let` does not let the user
+         access some of its fields.
+
+         For example (for the purpose of this example, we indicate
+         the labels used by terms):
+
+           let c @system:(l: P/left, r:P/left) = diff(l:true,r:false) 
+
+         Then, in the following lemma: 
+
+           lemma _ @system:(L: P/left, R:P,left) = c.
+           Proof. rewrite /c.
+
+         Squirrel unfold `c` into `(L:true,L:true)` instead of
+         `(L:true,R:false)`.  This is because, when unfolding `c`,
+         Squirrel looks for the system label to use in `c`'s
+         definition. Because there is an ambiguity, any of `l` and
+         `r` may be used. Squirrel chooses to use the association
+         `L <- l, R <- l`.
+
+         This behavior is not intuitive, and means that the `r`
+         labeled field of `c` is not accessible. Thus, it is
+         useless.
+
+         We forbid this using the invariant that macro definitions
+         use **single systems** as labels, ensuring that the mapping
+         from a system expression `{l1: SS1, ..., ln : SSn}` to the
+         labels of a `let` definition `SS1', ..., SSm'` is unique. *)
+      let single_list = List.map snd proj_single_list in
+      let sorted_single = List.sort_uniq Stdlib.compare single_list in
+      if List.length sorted_single <> List.length single_list then
+        error l KDecl (Failure "the multi-system single systems must be distincts")
+    in
+
+    let in_systems = Macros.Systems system in
+
+    ([], Some system, in_systems)
+
+(*------------------------------------------------------------------*)
 (** Parse an abstract or concrete list of function declarations. *)
 let parse_fun_decls
     table (op_kind : Decl.op_kind) (op_in_system : Decl.op_in_system)
@@ -1016,31 +1091,10 @@ let parse_fun_decls
   (* open a typing environment *)
   let ienv = Infer.mk_env () in
 
-  (* parse the system annotation, if any *)
-  let se_vars, system, (in_systems : Macros.in_systems) = (* see [Macros.in_systems] *)
-    match op_in_system with 
-    | `Any -> [], None, Macros.Any
-
-    | `Like p ->
-      let p = Symbols.System.convert_path p table in
-      let v = SE.Var.of_ident (Ident.create "'S") in
-      ( [v, [SE.Var.Compatible_with p]], 
-        Some (SE.var v), 
-        Macros.Like p )
-
-    | `Systems s ->
-      let vars, system = SE.Parse.parse ~implicit:false ~se_env:[] table s in
-      assert (vars = []);
-
-      let () = (* check that labels of [system]'s are unique *)
-        let p = odflt [] (SE.to_projs_any system) in
-        let sorted_p = List.sort_uniq Stdlib.compare p in
-        if List.length sorted_p <> List.length p then
-          error (L.loc s) KDecl (Failure "the multi-system labels must be distincts")
-      in
-      let in_systems = Macros.Systems system in
-
-      ([], Some system, in_systems)
+  (* parse the system annotation, if any
+     (see [Macros.in_systems]) *)
+  let se_vars, system, (in_systems : Macros.in_systems) =
+    fun_decl_parse_system_annotation table op_in_system
   in
   let context = omap (fun set -> SE.{ set; pair = None; }) system in
 
