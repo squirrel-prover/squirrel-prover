@@ -84,6 +84,8 @@ declaration).
    .. squirreldoc::
       abstract (=) ['a] : 'a -> 'a -> bool
 
+.. _section-operators:
+      
 Operators
 ---------
 

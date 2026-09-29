@@ -1274,7 +1274,7 @@ Local tactics
           ----------------------------------------
           n <> m
       
-.. tact:: smt {? ~prover} {? ~style} {? ~timeout:@natural}
+.. tact:: smt {? ~prover} {* ~option} {? ~timeout:@natural}
    :name: smt
     
     Try to discharge the current goal using an SMT solver. 
@@ -1285,14 +1285,12 @@ Local tactics
     after the name of the prover. The same goes with alternatives (`_BV`) for 
     Alt-Ergo and (`_noBV`) for Z3. 
 
-    The time before the timeout can be set with the flag `~timeout` (in seconds). 
-    By default it is 1s.
+    The timeout can be set using `~timeout:n` (`n` is in seconds, default to 1).
 
-    The theory used to translate timestamps is chosen using the flag `~style`. 
-    We can chose to translate timestamps to integers (`nat`) or to an abstract 
-    type with the usual equality (`abstract`) or not (`abstract_noeq`).
-
-       
+    Additional options can be provided:
+    
+    * `~no_macros` disable the translation of :ref:`macro<section-system-macros>` definitions;
+    * `~no_operators` disable translation of :ref:`operator<section-operators>` definitions.
     
     
 Global tactics
